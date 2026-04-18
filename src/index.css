@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-brand-primary: #1B4332;
+  --color-brand-secondary: #4A5568;
+  --color-brand-tertiary: #5A302F;
+  --color-brand-neutral: #F7FAFC;
+}
+
+body {
+  background-color: var(--color-brand-neutral);
+  background-image: radial-gradient(circle at 10% 10%, rgba(27, 67, 50, 0.12), transparent 22%), radial-gradient(circle at 95% 10%, rgba(90, 48, 47, 0.08), transparent 18%), radial-gradient(circle at 50% 100%, rgba(27, 67, 50, 0.05), transparent 30%);
+  color: var(--color-brand-secondary);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  transition: all 200ms ease;
+}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1B4332"/>
+  <text x="256" y="345" font-family="'Helvetica Neue',Arial,sans-serif" font-size="260" font-weight="800" fill="#FFFFFF" text-anchor="middle">A</text>
+  <circle cx="380" cy="148" r="44" fill="#52B788" opacity="0.9"/>
+  <ellipse cx="380" cy="148" rx="11" ry="22" fill="#1B4332" opacity="0.5" transform="rotate(-30 380 148)"/>
+</svg>
