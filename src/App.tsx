@@ -14,10 +14,7 @@ import { useDashboardMetrics } from './hooks/useDashboardMetrics';
 import { auth } from './lib/firebase';
 import { loadCampaign, saveCampaign } from './lib/firestore';
 import {
-  CC_DEFAULT,
   COMPANIES,
-  CQ_DEFAULT,
-  DEFAULT_HARVEST_DATA,
   DT,
   generateCalendarForYear,
   getAttendance,
@@ -35,9 +32,9 @@ export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
   const [activeTab, setActiveTab] = useState<'db' | 'as' | 'bi' | 'cq' | 'dt'>('db');
   const [campaignYear, setCampaignYear] = useState<number>(currentYear);
-  const [crews, setCrews] = useState<string[]>(campaignYear === currentYear ? CQ_DEFAULT : []);
-  const [crewCompanies, setCrewCompanies] = useState<Record<string, string>>(campaignYear === currentYear ? CC_DEFAULT : {});
-  const [harvestData, setHarvestData] = useState<HarvestData>(campaignYear === currentYear ? DEFAULT_HARVEST_DATA : {});
+  const [crews, setCrews] = useState<string[]>([]);
+  const [crewCompanies, setCrewCompanies] = useState<Record<string, string>>({});
+  const [harvestData, setHarvestData] = useState<HarvestData>({});
   const [hmMode, setHmMode] = useState<'a' | 'b' | 'r'>('a');
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [daysFilter, setDaysFilter] = useState<number>(15);
@@ -100,9 +97,9 @@ export default function App() {
         setCrewCompanies(doc.crewCompanies);
         setHarvestData(doc.harvestData);
       } else {
-        setCrews(campaignYear === currentYear ? CQ_DEFAULT : []);
-        setCrewCompanies(campaignYear === currentYear ? CC_DEFAULT : {});
-        setHarvestData(campaignYear === currentYear ? DEFAULT_HARVEST_DATA : {});
+        setCrews([]);
+        setCrewCompanies({});
+        setHarvestData({});
       }
     }).catch((err) => console.error('Error loading campaign', err));
   }, [campaignYear, user]);

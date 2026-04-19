@@ -35,61 +35,7 @@ export const monthNames: Record<string, string> = {
   '12': 'Diciembre',
 };
 
-export const CQ_DEFAULT = [
-  'CEBALLOS', 'DIAZ G', 'DIAZ HUGO', 'JAIME', 'MALDONADO',
-  'MONSERRAT', 'RODRIGUEZ', 'VIZCARRA H', 'VIZCARRA M'
-];
-
-export const CC_DEFAULT: Record<string, string> = {
-  'CEBALLOS': 'Limas y Limones S.R.L.',
-  'DIAZ G': 'Limas y Limones S.R.L.',
-  'DIAZ HUGO': 'A.Z. Agricolas S.R.L.',
-  'JAIME': 'A.Z. Agricolas S.R.L.',
-  'MALDONADO': 'Limas y Limones S.R.L.',
-  'MONSERRAT': 'A.Z. Agricolas S.R.L.',
-  'RODRIGUEZ': 'Limas y Limones S.R.L.',
-  'VIZCARRA H': 'A.Z. Agricolas S.R.L.',
-  'VIZCARRA M': 'Limas y Limones S.R.L.'
-};
-
 export const COMPANIES = ['Limas y Limones S.R.L.', 'A.Z. Agricolas S.R.L.'];
-
-export const AS_SEED: Record<string, Record<string, number>> = {
-  'CEBALLOS': { '25/03': 25, '26/03': 23, '28/03': 20, '30/03': 26, '31/03': 28, '01/04': 23, '02/04': 32, '04/04': 26, '08/04': 31, '11/04': 25, '13/04': 24, '14/04': 22 },
-  'DIAZ G': { '25/03': 26, '26/03': 29, '28/03': 20, '30/03': 30, '31/03': 36, '01/04': 41, '02/04': 29, '04/04': 46, '08/04': 54, '11/04': 25, '13/04': 40, '14/04': 30 },
-  'DIAZ HUGO': { '25/03': 27, '26/03': 20, '28/03': 17, '30/03': 23, '31/03': 20, '01/04': 24, '02/04': 28, '04/04': 29, '08/04': 30, '11/04': 19, '13/04': 31, '14/04': 20 },
-  'JAIME': { '25/03': 23, '26/03': 20, '28/03': 19, '30/03': 21, '31/03': 28, '01/04': 27, '02/04': 21, '04/04': 26, '08/04': 34, '11/04': 11, '14/04': 34 },
-  'MALDONADO': { '25/03': 15, '26/03': 13, '28/03': 18, '30/03': 19, '31/03': 20, '01/04': 20, '02/04': 21, '04/04': 20, '08/04': 21, '11/04': 18 },
-  'MONSERRAT': { '30/03': 19, '31/03': 20, '01/04': 19, '04/04': 19, '08/04': 21, '11/04': 17, '13/04': 21 },
-  'RODRIGUEZ': { '25/03': 20, '28/03': 19, '30/03': 25, '01/04': 26, '02/04': 25, '04/04': 25, '08/04': 31, '13/04': 29, '14/04': 36 },
-  'VIZCARRA H': { '25/03': 27, '26/03': 29, '28/03': 27, '30/03': 26, '01/04': 34, '02/04': 35, '04/04': 34, '08/04': 39, '11/04': 31, '13/04': 31, '14/04': 31 },
-  'VIZCARRA M': { '25/03': 23, '26/03': 23, '28/03': 22, '30/03': 20, '01/04': 26, '02/04': 28, '04/04': 24, '08/04': 26, '11/04': 17, '13/04': 28, '14/04': 30 },
-};
-
-export const STORAGE_KEYS = {
-  harvest: 'harvest_cit_v1',
-  crews: 'cq_cit_v4',
-  companies: 'cc_cit_v4',
-  legacy: {
-    attendance: 'asist_cit_v4',
-    bins: 'bins_cit_v4',
-    buses: 'buses_cit_v4',
-    foremen: 'foremen_cit_v4',
-  },
-};
-
-export const DEFAULT_HARVEST_DATA: HarvestData = createHarvestDataFromSeed(AS_SEED);
-
-export function createHarvestDataFromSeed(seed: Record<string, Record<string, number>>): HarvestData {
-  const data: HarvestData = {};
-  Object.entries(seed).forEach(([crew, dates]) => {
-    data[crew] = {};
-    Object.entries(dates).forEach(([date, attendance]) => {
-      data[crew][date] = { attendance };
-    });
-  });
-  return data;
-}
 
 export function normalizeCrewName(name: string) {
   return name.trim().toUpperCase();
