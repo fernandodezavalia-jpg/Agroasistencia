@@ -451,6 +451,9 @@ export default function App() {
         const nextCrews = [...crews];
         const nextCompanies = { ...crewCompanies };
         let importedRows = 0;
+        const importedCrews = new Set<string>();
+        const importedDates = new Set<string>();
+        let withBins = 0, withBus = 0, withForeman = 0, skippedRows = 0;
 
         xlsxRows.forEach((row: Record<string, string | number>) => {
           const rawDate = String(row['Día'] ?? row['Dia'] ?? row['Date'] ?? '').trim();
@@ -461,7 +464,7 @@ export default function App() {
           const rawForeman = String(row['Capataz'] ?? row['Foreman'] ?? '').trim().toLowerCase();
           const rawCompany = String(row['Empresa'] ?? row['Company'] ?? '').trim().toLowerCase();
           const crew = normalizeCrewName(rawCrew);
-          if (!crew || !rawDate) return;
+          if (!crew || !rawDate) { skippedRows += 1; return; }
 
           const resolvedCompany = rawCompany.includes('az') || rawCompany.includes('a.z')
             ? 'A.Z. Agricolas S.R.L.'
@@ -481,15 +484,16 @@ export default function App() {
           const attendanceValue = Number(rawAttendance);
           const binsValue = Number(rawBins);
           if (!Number.isNaN(attendanceValue) && rawAttendance !== '') record.attendance = attendanceValue;
-          if (!Number.isNaN(binsValue) && rawBins !== '') record.bins = binsValue;
-          // Support both "Sí"/"Si"/"s" and 1 for boolean fields
+          if (!Number.isNaN(binsValue) && rawBins !== '') { record.bins = binsValue; withBins += 1; }
           const busVal = String(rawBus);
           const foremanVal = String(rawForeman);
-          if (busVal.startsWith('s') || busVal === '1') record.bus = true;
-          if (foremanVal.startsWith('s') || foremanVal === '1') record.foreman = true;
+          if (busVal.startsWith('s') || busVal === '1') { record.bus = true; withBus += 1; }
+          if (foremanVal.startsWith('s') || foremanVal === '1') { record.foreman = true; withForeman += 1; }
           if (Object.keys(record).length > 0) {
-            nextData[crew][rawDate] = record;
+            nextData[crew][rawDate] = { ...nextData[crew][rawDate], ...record };
             importedRows += 1;
+            importedCrews.add(crew);
+            importedDates.add(rawDate);
           }
         });
 
@@ -501,7 +505,17 @@ export default function App() {
         setCrews(nextCrews);
         setCrewCompanies(nextCompanies);
         setHarvestData(nextData);
-        showMsg(setImportMsg, `Importadas ${importedRows} filas`, 'text-emerald-500');
+
+        const summary = [
+          `✓ ${importedRows} filas`,
+          `${importedCrews.size} cuadrillas`,
+          `${importedDates.size} días`,
+          withBins > 0 ? `${withBins} con bins` : '',
+          withBus > 0 ? `${withBus} con colectivo` : '',
+          withForeman > 0 ? `${withForeman} con capataz` : '',
+          skippedRows > 0 ? `⚠ ${skippedRows} filas ignoradas` : '',
+        ].filter(Boolean).join(' · ');
+        showMsg(setImportMsg, summary, 'text-emerald-600');
       } catch (error) {
         console.error(error);
         showMsg(setImportMsg, 'Error procesando el archivo', 'text-red-500');
