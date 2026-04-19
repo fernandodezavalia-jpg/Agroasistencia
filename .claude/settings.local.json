@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npx firebase-tools *)",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__get_deployment",
+      "mcp__claude_ai_Vercel__get_access_to_vercel_url",
+      "mcp__claude_ai_Vercel__web_fetch_vercel_url",
+      "Bash(curl -s \"https://agroasistencia.vercel.app/assets/index-Bmivlglo.js\")"
     ]
   }
 }
