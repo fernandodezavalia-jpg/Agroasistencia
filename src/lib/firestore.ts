@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import type { HarvestData } from './harvestData';
 
@@ -8,18 +8,25 @@ export interface CampaignDoc {
   crewCompanies: Record<string, string>;
 }
 
-export async function loadCampaign(year: number): Promise<CampaignDoc | null> {
-  const ref = doc(db, 'campaigns', String(year));
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return null;
-  const raw = snap.data();
+function parseDoc(raw: Record<string, unknown>): CampaignDoc {
   return {
-    crews: raw.crews ?? [],
-    crewCompanies: raw.crewCompanies ?? {},
+    crews: (raw.crews as string[]) ?? [],
+    crewCompanies: (raw.crewCompanies as Record<string, string>) ?? {},
     harvestData: typeof raw.harvestData === 'string'
       ? JSON.parse(raw.harvestData)
-      : (raw.harvestData ?? {}),
+      : ((raw.harvestData as HarvestData) ?? {}),
   };
+}
+
+export function subscribeCampaign(
+  year: number,
+  onData: (doc: CampaignDoc | null) => void,
+  onError: (err: Error) => void,
+): () => void {
+  const ref = doc(db, 'campaigns', String(year));
+  return onSnapshot(ref, (snap) => {
+    onData(snap.exists() ? parseDoc(snap.data()) : null);
+  }, onError);
 }
 
 export async function saveCampaign(year: number, data: CampaignDoc): Promise<void> {

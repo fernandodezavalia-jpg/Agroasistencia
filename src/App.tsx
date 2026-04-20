@@ -12,7 +12,7 @@ import ConfirmModal from './components/ConfirmModal';
 import LoginScreen from './components/LoginScreen';
 import { useDashboardMetrics } from './hooks/useDashboardMetrics';
 import { auth } from './lib/firebase';
-import { loadCampaign, saveCampaign } from './lib/firestore';
+import { subscribeCampaign, saveCampaign } from './lib/firestore';
 import {
   COMPANIES,
   DT,
@@ -82,6 +82,7 @@ export default function App() {
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dataLoadedRef = useRef(false);
+  const fromFirestoreRef = useRef(false);
 
   // Auth listener
   useEffect(() => {
@@ -89,27 +90,37 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Load from Firestore when year changes or user logs in
+  // Real-time Firestore listener — re-subscribes when year or user changes
   useEffect(() => {
     if (!user) return;
     dataLoadedRef.current = false;
-    loadCampaign(campaignYear).then((doc) => {
-      if (doc) {
-        setCrews(doc.crews);
-        setCrewCompanies(doc.crewCompanies);
-        setHarvestData(doc.harvestData);
-      } else {
-        setCrews([]);
-        setCrewCompanies({});
-        setHarvestData({});
-      }
-      dataLoadedRef.current = true;
-    }).catch((err) => console.error('Error loading campaign', err));
+    const unsub = subscribeCampaign(
+      campaignYear,
+      (campaignDoc) => {
+        fromFirestoreRef.current = true;
+        if (campaignDoc) {
+          setCrews(campaignDoc.crews);
+          setCrewCompanies(campaignDoc.crewCompanies);
+          setHarvestData(campaignDoc.harvestData);
+        } else {
+          setCrews([]);
+          setCrewCompanies({});
+          setHarvestData({});
+        }
+        dataLoadedRef.current = true;
+      },
+      (err) => console.error('Firestore error', err),
+    );
+    return unsub;
   }, [campaignYear, user]);
 
-  // Debounced save to Firestore on data changes
+  // Debounced save — skips when data came from Firestore to avoid loop
   useEffect(() => {
     if (!user || !dataLoadedRef.current) return;
+    if (fromFirestoreRef.current) {
+      fromFirestoreRef.current = false;
+      return;
+    }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveCampaign(campaignYear, { harvestData, crews, crewCompanies }).catch((err) =>
