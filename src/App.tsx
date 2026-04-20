@@ -435,14 +435,20 @@ export default function App() {
     XLSXStyle.writeFile(wb, `Cosecha_${campaignYear}_${companyLabel.replace(/[^a-zA-Z0-9]/g, '_')}_${daysFilter}d.xlsx`);
   };
 
-  const normalizeImportDate = (raw: string): string | null => {
-    const s = raw.trim();
+  const normalizeImportDate = (raw: string | number | Date): string | null => {
+    // Excel Date object → DD/MM
+    if (raw instanceof Date) {
+      const d = raw.getUTCDate();
+      const m = raw.getUTCMonth() + 1;
+      return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+    }
+    const s = String(raw).trim();
     // Already DD/MM
     if (/^\d{1,2}\/\d{1,2}$/.test(s)) {
       const [d, m] = s.split('/');
       return `${d.padStart(2, '0')}/${m.padStart(2, '0')}`;
     }
-    // D/M/YY or D/M/YYYY or D-M-YYYY
+    // D/M/YY or D/M/YYYY — assume day first (Argentine format)
     const match = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/);
     if (match) return `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}`;
     return null;
@@ -456,7 +462,8 @@ export default function App() {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSXStyle.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const xlsxRows = XLSXStyle.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '', raw: false });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const xlsxRows = XLSXStyle.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '', cellDates: true } as any);
         const nextData: HarvestData = { ...harvestData };
         const nextCrews = [...crews];
         const nextCompanies = { ...crewCompanies };
@@ -465,8 +472,8 @@ export default function App() {
         const importedDates = new Set<string>();
         let withBins = 0, withBus = 0, withForeman = 0, skippedRows = 0;
 
-        xlsxRows.forEach((row: Record<string, string | number>) => {
-          const rawDate = normalizeImportDate(String(row['Día'] ?? row['Dia'] ?? row['Date'] ?? '')) ?? '';
+        xlsxRows.forEach((row: Record<string, string | number | Date>) => {
+          const rawDate = normalizeImportDate(row['Día'] ?? row['Dia'] ?? row['Date'] ?? '') ?? '';
           const rawCrew = String(row['Cuadrilla'] ?? row['cuadrilla'] ?? row['Crew'] ?? '').trim();
           const rawAttendance = row['Asistencia'] ?? row['Attendance'] ?? '';
           const rawBins = row['Bins/Bolsones'] ?? row['Bins'] ?? row['bins'] ?? '';
