@@ -436,10 +436,17 @@ export default function App() {
   };
 
   const normalizeImportDate = (raw: string | number | Date): string | null => {
-    // Excel Date object → DD/MM
+    // Excel Date object
     if (raw instanceof Date) {
       const d = raw.getUTCDate();
       const m = raw.getUTCMonth() + 1;
+      return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+    }
+    // Excel serial number (e.g. 46113 = April 1 2026)
+    if (typeof raw === 'number' && raw > 40000 && raw < 60000) {
+      const date = new Date(Math.round((raw - 25569) * 86400 * 1000));
+      const d = date.getUTCDate();
+      const m = date.getUTCMonth() + 1;
       return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
     }
     const s = String(raw).trim();
@@ -460,10 +467,10 @@ export default function App() {
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSXStyle.read(data, { type: 'array' });
+        const workbook = XLSXStyle.read(data, { type: 'array', cellDates: true } as any);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const xlsxRows = XLSXStyle.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '', cellDates: true } as any);
+        const xlsxRows = XLSXStyle.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
         const nextData: HarvestData = { ...harvestData };
         const nextCrews = [...crews];
         const nextCompanies = { ...crewCompanies };
