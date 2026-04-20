@@ -81,6 +81,7 @@ export default function App() {
   const todayKey = getClosestWorkday(formatDateKey(new Date()));
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataLoadedRef = useRef(false);
 
   // Auth listener
   useEffect(() => {
@@ -91,6 +92,7 @@ export default function App() {
   // Load from Firestore when year changes or user logs in
   useEffect(() => {
     if (!user) return;
+    dataLoadedRef.current = false;
     loadCampaign(campaignYear).then((doc) => {
       if (doc) {
         setCrews(doc.crews);
@@ -101,12 +103,13 @@ export default function App() {
         setCrewCompanies({});
         setHarvestData({});
       }
+      dataLoadedRef.current = true;
     }).catch((err) => console.error('Error loading campaign', err));
   }, [campaignYear, user]);
 
   // Debounced save to Firestore on data changes
   useEffect(() => {
-    if (!user) return;
+    if (!user || !dataLoadedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveCampaign(campaignYear, { harvestData, crews, crewCompanies }).catch((err) =>
