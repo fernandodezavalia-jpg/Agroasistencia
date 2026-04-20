@@ -1,11 +1,12 @@
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
-import type { HarvestData } from './harvestData';
+import type { HarvestData, SeasonConfig } from './harvestData';
 
 export interface CampaignDoc {
   harvestData: HarvestData;
   crews: string[];
   crewCompanies: Record<string, string>;
+  seasonConfig?: SeasonConfig;
 }
 
 function parseDoc(raw: Record<string, unknown>): CampaignDoc {
@@ -15,6 +16,7 @@ function parseDoc(raw: Record<string, unknown>): CampaignDoc {
     harvestData: typeof raw.harvestData === 'string'
       ? JSON.parse(raw.harvestData)
       : ((raw.harvestData as HarvestData) ?? {}),
+    seasonConfig: (raw.seasonConfig as SeasonConfig) ?? undefined,
   };
 }
 
@@ -35,5 +37,6 @@ export async function saveCampaign(year: number, data: CampaignDoc): Promise<voi
     crews: data.crews,
     crewCompanies: data.crewCompanies,
     harvestData: JSON.stringify(data.harvestData),
+    seasonConfig: data.seasonConfig ?? null,
   });
 }

@@ -2,6 +2,14 @@ import { useCallback, useMemo } from 'react';
 import { getAttendance, getBins, getBus, getForeman } from '../lib/harvestData';
 import type { HarvestData } from '../lib/harvestData';
 
+export interface CrewSemaforoItem {
+  crew: string;
+  displayName: string;
+  status: 'green' | 'yellow' | 'red' | 'gray';
+  recentRend: number | null;
+  seasonRend: number | null;
+}
+
 interface MetricsInput {
   filteredCrews: string[];
   filteredDT: string[];
@@ -236,6 +244,73 @@ export function useDashboardMetrics({
     );
   }, [formCrews, harvestData, asDate, activeDT, asCurrentMonth]);
 
+  // Bins for current month and fortnight (using todayKey as reference)
+  const currentMonthBins = useMemo(() => {
+    const month = todayKey.split('/')[1];
+    const monthDates = activeDT.filter((date, i) => date.split('/')[1] === month && activeSN[i] === 0);
+    return filteredCrews.reduce(
+      (sum, crew) => sum + monthDates.reduce((ds, date) => ds + (getBins(harvestData, crew, date) ?? 0), 0),
+      0,
+    );
+  }, [todayKey, filteredCrews, harvestData, activeDT, activeSN]);
+
+  const currentFortBins = useMemo(() => {
+    const month = todayKey.split('/')[1];
+    const dayNum = parseInt(todayKey.split('/')[0], 10);
+    const isFirstFort = dayNum <= 15;
+    const fortDates = activeDT.filter((date, i) => {
+      const dm = date.split('/')[1];
+      const dd = parseInt(date.split('/')[0], 10);
+      return dm === month && activeSN[i] === 0 && (isFirstFort ? dd <= 15 : dd > 15);
+    });
+    return filteredCrews.reduce(
+      (sum, crew) => sum + fortDates.reduce((ds, date) => ds + (getBins(harvestData, crew, date) ?? 0), 0),
+      0,
+    );
+  }, [todayKey, filteredCrews, harvestData, activeDT, activeSN]);
+
+  // Semáforo: compare each crew's last-7-days rendimiento vs full-season average
+  const crewSemaforo = useMemo((): CrewSemaforoItem[] => {
+    const daysWithData = activeDT.filter((date) =>
+      filteredCrews.some((crew) => getAttendance(harvestData, crew, date) !== null),
+    );
+    const recentDays = daysWithData.slice(-7);
+
+    return filteredCrews.map((crew) => {
+      let seasonBins = 0, seasonAttendance = 0;
+      activeDT.forEach((date) => {
+        const a = getAttendance(harvestData, crew, date);
+        const b = getBins(harvestData, crew, date);
+        if (a !== null && b !== null) { seasonBins += b; seasonAttendance += a; }
+      });
+      const seasonRend = seasonAttendance > 0 ? seasonBins / seasonAttendance : null;
+
+      let recentBins = 0, recentAttendance = 0;
+      recentDays.forEach((date) => {
+        const a = getAttendance(harvestData, crew, date);
+        const b = getBins(harvestData, crew, date);
+        if (a !== null && b !== null) { recentBins += b; recentAttendance += a; }
+      });
+      const recentRend = recentAttendance > 0 ? recentBins / recentAttendance : null;
+
+      let status: 'green' | 'yellow' | 'red' | 'gray' = 'gray';
+      if (recentRend !== null && seasonRend !== null && seasonRend > 0) {
+        const ratio = recentRend / seasonRend;
+        status = ratio >= 1.1 ? 'green' : ratio >= 0.85 ? 'yellow' : 'red';
+      } else if (recentRend !== null) {
+        status = 'yellow';
+      }
+
+      return {
+        crew,
+        displayName: crew.charAt(0) + crew.slice(1).toLowerCase(),
+        status,
+        recentRend,
+        seasonRend,
+      };
+    }).filter((item) => item.seasonRend !== null || item.recentRend !== null);
+  }, [filteredCrews, harvestData, activeDT]);
+
   // Per-company metrics for Dashboard comparison
   const companyMetrics = useMemo(
     () =>
@@ -300,5 +375,8 @@ export function useDashboardMetrics({
     foremenFortnight,
     foremenMonth,
     companyMetrics,
+    crewSemaforo,
+    currentMonthBins,
+    currentFortBins,
   };
 }

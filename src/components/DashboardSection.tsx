@@ -1,6 +1,9 @@
 import { Users, Box, TrendingUp, ClipboardList } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Line, CartesianGrid } from 'recharts';
 import type { ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import type { CrewSemaforoItem } from '../hooks/useDashboardMetrics';
+import type { SeasonConfig } from '../lib/harvestData';
+import { monthNames } from '../lib/harvestData';
 
 export interface RankedDataItem {
   name: string;
@@ -33,6 +36,11 @@ interface DashboardSectionProps {
   daysWithAttendanceAndNoBins: number;
   projectedMonthBins: number | null;
   companyMetrics: CompanyMetric[];
+  crewSemaforo: CrewSemaforoItem[];
+  seasonConfig?: SeasonConfig;
+  currentMonthBins: number;
+  currentFortBins: number;
+  todayKey: string;
 }
 
 const COMPANY_COLORS: Record<string, { primary: string; light: string; badge: string }> = {
@@ -57,7 +65,25 @@ export default function DashboardSection({
   daysWithAttendanceAndNoBins,
   projectedMonthBins,
   companyMetrics,
+  crewSemaforo,
+  seasonConfig,
+  currentMonthBins,
+  currentFortBins,
+  todayKey,
 }: DashboardSectionProps) {
+  const todayMonth = todayKey.split('/')[1];
+  const todayDayNum = parseInt(todayKey.split('/')[0], 10);
+  const isFirstFort = todayDayNum <= 15;
+  const monthPct = seasonConfig?.monthlyTarget
+    ? Math.min(100, Math.round((currentMonthBins / seasonConfig.monthlyTarget) * 100))
+    : 0;
+  const fortPct = seasonConfig?.quincenalTarget
+    ? Math.min(100, Math.round((currentFortBins / seasonConfig.quincenalTarget) * 100))
+    : 0;
+  const barColor = (pct: number) =>
+    pct >= 100 ? 'bg-emerald-500' : pct >= 70 ? 'bg-amber-400' : 'bg-red-500';
+  const textColor = (pct: number) =>
+    pct >= 100 ? 'text-emerald-500' : pct >= 70 ? 'text-amber-500' : 'text-red-500';
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* KPI Cards */}
@@ -146,6 +172,90 @@ export default function DashboardSection({
           </div>
         </div>
       </div>
+
+      {/* Semáforo de cuadrillas */}
+      {crewSemaforo.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+          <p className="text-xs text-brand-secondary font-bold mb-4 tracking-widest uppercase">
+            Semáforo de Cuadrillas — Últimos 7 días vs. Promedio Temporada
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {crewSemaforo.map((item) => (
+              <div
+                key={item.crew}
+                title={`Últimos 7 días: ${item.recentRend?.toFixed(2) ?? '—'} b/t | Temporada: ${item.seasonRend?.toFixed(2) ?? '—'} b/t`}
+                className="flex items-center gap-2 bg-brand-neutral px-3 py-2 rounded-full border border-gray-200 cursor-default"
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                    item.status === 'green'
+                      ? 'bg-emerald-500'
+                      : item.status === 'yellow'
+                        ? 'bg-amber-400'
+                        : item.status === 'red'
+                          ? 'bg-red-500'
+                          : 'bg-gray-300'
+                  }`}
+                />
+                <span className="text-xs font-bold text-brand-primary">{item.displayName}</span>
+                {item.recentRend !== null && (
+                  <span className="text-xs text-brand-secondary">{item.recentRend.toFixed(2)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-brand-secondary mt-3">
+            Verde: +10% sobre el promedio · Amarillo: dentro del ±10% · Rojo: -15% o más por debajo
+          </p>
+        </div>
+      )}
+
+      {/* Season progress (mini) — shown only if targets are configured */}
+      {seasonConfig && (seasonConfig.monthlyTarget > 0 || seasonConfig.quincenalTarget > 0) && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
+          <p className="text-xs text-brand-secondary font-bold mb-4 tracking-widest uppercase">
+            Meta de Temporada — {monthNames[todayMonth]}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {seasonConfig.monthlyTarget > 0 && (
+              <div>
+                <div className="flex justify-between items-baseline mb-2">
+                  <span className="text-xs font-bold text-brand-secondary uppercase tracking-wider">Mensual</span>
+                  <span className={`text-lg font-extrabold font-heading ${textColor(monthPct)}`}>{monthPct}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mb-1">
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-700 ${barColor(monthPct)}`}
+                    style={{ width: `${monthPct}%` }}
+                  />
+                </div>
+                <p className="text-xs text-brand-secondary">
+                  {currentMonthBins.toLocaleString('es-AR')} / {seasonConfig.monthlyTarget.toLocaleString('es-AR')} bins
+                </p>
+              </div>
+            )}
+            {seasonConfig.quincenalTarget > 0 && (
+              <div>
+                <div className="flex justify-between items-baseline mb-2">
+                  <span className="text-xs font-bold text-brand-secondary uppercase tracking-wider">
+                    {isFirstFort ? '1ra Quincena' : '2da Quincena'}
+                  </span>
+                  <span className={`text-lg font-extrabold font-heading ${textColor(fortPct)}`}>{fortPct}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mb-1">
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-700 ${barColor(fortPct)}`}
+                    style={{ width: `${fortPct}%` }}
+                  />
+                </div>
+                <p className="text-xs text-brand-secondary">
+                  {currentFortBins.toLocaleString('es-AR')} / {seasonConfig.quincenalTarget.toLocaleString('es-AR')} bins
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Projection */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 mb-6">

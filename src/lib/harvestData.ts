@@ -5,6 +5,11 @@ export type HarvestRecord = {
   foreman?: boolean;
 };
 
+export interface SeasonConfig {
+  monthlyTarget: number;
+  quincenalTarget: number;
+}
+
 export type HarvestData = Record<string, Record<string, HarvestRecord>>;
 
 const YEAR = 2026;

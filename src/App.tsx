@@ -10,6 +10,8 @@ import DashboardSection from './components/DashboardSection';
 import HeatmapSection from './components/HeatmapSection';
 import ConfirmModal from './components/ConfirmModal';
 import LoginScreen from './components/LoginScreen';
+import SeasonSection from './components/SeasonSection';
+import RankingSection from './components/RankingSection';
 import { useDashboardMetrics } from './hooks/useDashboardMetrics';
 import { auth } from './lib/firebase';
 import { subscribeCampaign, saveCampaign } from './lib/firestore';
@@ -24,17 +26,18 @@ import {
   getRecord,
   normalizeCrewName,
 } from './lib/harvestData';
-import type { HarvestData, HarvestRecord } from './lib/harvestData';
+import type { HarvestData, HarvestRecord, SeasonConfig } from './lib/harvestData';
 
 const currentYear = new Date().getFullYear();
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
-  const [activeTab, setActiveTab] = useState<'db' | 'as' | 'bi' | 'cq' | 'dt'>('db');
+  const [activeTab, setActiveTab] = useState<'db' | 'as' | 'bi' | 'cq' | 'dt' | 'tm' | 'rk'>('db');
   const [campaignYear, setCampaignYear] = useState<number>(currentYear);
   const [crews, setCrews] = useState<string[]>([]);
   const [crewCompanies, setCrewCompanies] = useState<Record<string, string>>({});
   const [harvestData, setHarvestData] = useState<HarvestData>({});
+  const [seasonConfig, setSeasonConfig] = useState<SeasonConfig | undefined>(undefined);
   const [hmMode, setHmMode] = useState<'a' | 'b' | 'r'>('a');
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [daysFilter, setDaysFilter] = useState<number>(15);
@@ -102,10 +105,12 @@ export default function App() {
           setCrews(campaignDoc.crews);
           setCrewCompanies(campaignDoc.crewCompanies);
           setHarvestData(campaignDoc.harvestData);
+          setSeasonConfig(campaignDoc.seasonConfig ?? undefined);
         } else {
           setCrews([]);
           setCrewCompanies({});
           setHarvestData({});
+          setSeasonConfig(undefined);
         }
         dataLoadedRef.current = true;
       },
@@ -123,14 +128,14 @@ export default function App() {
     }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      saveCampaign(campaignYear, { harvestData, crews, crewCompanies }).catch((err) =>
+      saveCampaign(campaignYear, { harvestData, crews, crewCompanies, seasonConfig }).catch((err) =>
         console.error('Error saving campaign', err),
       );
     }, 1500);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [crews, crewCompanies, harvestData, campaignYear, user]);
+  }, [crews, crewCompanies, harvestData, seasonConfig, campaignYear, user]);
 
   const showMsg = (setter: React.Dispatch<React.SetStateAction<{ text: string; color: string }>>, text: string, color: string) => {
     setter({ text, color });
@@ -680,6 +685,8 @@ export default function App() {
           { id: 'bi', label: 'Bins/Bolsones', icon: '🍋' },
           { id: 'cq', label: 'Cuadrillas', icon: '📋' },
           { id: 'dt', label: 'Detalle', icon: '📅' },
+          { id: 'tm', label: 'Temporada', icon: '🎯' },
+          { id: 'rk', label: 'Ranking', icon: '🏆' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -709,6 +716,11 @@ export default function App() {
           daysWithAttendanceAndNoBins={metrics.daysWithAttendanceAndNoBins}
           projectedMonthBins={metrics.projectedMonthBins}
           companyMetrics={metrics.companyMetrics}
+          crewSemaforo={metrics.crewSemaforo}
+          seasonConfig={seasonConfig}
+          currentMonthBins={metrics.currentMonthBins}
+          currentFortBins={metrics.currentFortBins}
+          todayKey={todayKey}
         />
       )}
 
@@ -770,6 +782,28 @@ export default function App() {
           handleAddCq={handleAddCq}
           handleRemoveCq={handleRemoveCq}
           cqMsg={cqMsg}
+        />
+      )}
+
+      {activeTab === 'tm' && (
+        <SeasonSection
+          seasonConfig={seasonConfig}
+          onSave={(config) => setSeasonConfig(config)}
+          currentMonthBins={metrics.currentMonthBins}
+          currentFortBins={metrics.currentFortBins}
+          projectedMonthBins={metrics.projectedMonthBins}
+          todayKey={todayKey}
+          activeDT={activeDT}
+          activeSN={activeSN}
+        />
+      )}
+
+      {activeTab === 'rk' && (
+        <RankingSection
+          crews={crews}
+          crewCompanies={crewCompanies}
+          harvestData={harvestData}
+          activeDT={activeDT}
         />
       )}
 
