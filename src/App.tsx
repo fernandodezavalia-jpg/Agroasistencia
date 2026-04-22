@@ -43,6 +43,7 @@ const getPeriodLabel = (period: string, year: number) => {
   const [half, month] = period.split('-');
   const monthIdx = parseInt(month, 10) - 1;
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  if (half === 'M') return `${MONTH_NAMES[monthIdx]} completo (01 al ${daysInMonth})`;
   const range = half === 'Q1' ? '01 al 15' : `16 al ${daysInMonth}`;
   return `${half === 'Q1' ? '1ª' : '2ª'} quincena de ${MONTH_NAMES[monthIdx]} (${range})`;
 };
@@ -180,6 +181,7 @@ export default function App() {
     return activeDT.filter((date) => {
       const [dayStr, monthStr] = date.split('/');
       if (monthStr !== month) return false;
+      if (half === 'M') return true;
       const day = parseInt(dayStr, 10);
       return half === 'Q1' ? day <= 15 : day >= 16;
     });
@@ -636,6 +638,7 @@ export default function App() {
                 const daysInMonth = new Date(campaignYear, idx + 1, 0).getDate();
                 return (
                   <optgroup key={month} label={`— ${monthName} —`}>
+                    <option value={`M-${month}`}>Mes completo  ·  01 al {daysInMonth}</option>
                     <option value={`Q1-${month}`}>1ª quincena  ·  01 al 15</option>
                     <option value={`Q2-${month}`}>2ª quincena  ·  16 al {daysInMonth}</option>
                   </optgroup>
