@@ -16,7 +16,13 @@ function parseDoc(raw: Record<string, unknown>): CampaignDoc {
     harvestData: typeof raw.harvestData === 'string'
       ? JSON.parse(raw.harvestData)
       : ((raw.harvestData as HarvestData) ?? {}),
-    seasonConfig: (raw.seasonConfig as SeasonConfig) ?? undefined,
+    seasonConfig:
+      raw.seasonConfig !== null &&
+      typeof raw.seasonConfig === 'object' &&
+      typeof (raw.seasonConfig as SeasonConfig).monthlyTarget === 'number' &&
+      typeof (raw.seasonConfig as SeasonConfig).quincenalTarget === 'number'
+        ? (raw.seasonConfig as SeasonConfig)
+        : undefined,
   };
 }
 

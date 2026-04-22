@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getAttendance, getBins } from '../lib/harvestData';
+import { getAttendance, getBins, displayCrewName } from '../lib/harvestData';
 import type { HarvestData } from '../lib/harvestData';
 
 interface Props {
@@ -29,7 +29,7 @@ export default function RankingSection({ crews, crewCompanies, harvestData, acti
         });
         return {
           crew,
-          displayName: crew.charAt(0) + crew.slice(1).toLowerCase(),
+          displayName: displayCrewName(crew),
           company: crewCompanies[crew] ?? '',
           jornales: totalAttendance,
           bins: totalBins,
@@ -66,13 +66,13 @@ export default function RankingSection({ crews, crewCompanies, harvestData, acti
           <table className="w-full">
             <thead>
               <tr className="bg-brand-neutral">
-                <th className="text-left text-xs font-bold text-brand-secondary uppercase tracking-wider px-6 py-3">#</th>
+                <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-6 py-3">#</th>
                 <th className="text-left text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Cuadrilla</th>
                 <th className="text-left text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Empresa</th>
-                <th className="text-right text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Jornales</th>
-                <th className="text-right text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Bins</th>
-                <th className="text-right text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Rendimiento</th>
-                <th className="text-right text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Días Trab.</th>
+                <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Jornales</th>
+                <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Bins</th>
+                <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Rendimiento</th>
+                <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Días Trab.</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -81,7 +81,7 @@ export default function RankingSection({ crews, crewCompanies, harvestData, acti
                   key={item.crew}
                   className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-brand-neutral/50 transition-colors`}
                 >
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-center">
                     <span className={`text-sm font-extrabold ${MEDAL_COLOR[index] ?? 'text-brand-secondary'}`}>
                       {index + 1}
                     </span>
@@ -96,22 +96,22 @@ export default function RankingSection({ crews, crewCompanies, harvestData, acti
                       {item.company.split(' ')[0]}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-right">
+                  <td className="px-4 py-4 text-center">
                     <span className="font-bold text-brand-primary text-sm">
                       {item.jornales.toLocaleString('es-AR')}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-right">
+                  <td className="px-4 py-4 text-center">
                     <span className="font-bold text-brand-primary text-sm">
                       {item.bins > 0 ? item.bins.toLocaleString('es-AR') : '—'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-right">
+                  <td className="px-4 py-4 text-center">
                     <span className="font-bold text-brand-primary text-sm">
                       {item.rendimiento !== null ? item.rendimiento.toFixed(2) : '—'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-right">
+                  <td className="px-4 py-4 text-center">
                     <span className="font-medium text-brand-secondary text-sm">{item.diasTrabajados}</span>
                   </td>
                 </tr>

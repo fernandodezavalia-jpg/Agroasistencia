@@ -30,6 +30,23 @@ import type { HarvestData, HarvestRecord, SeasonConfig } from './lib/harvestData
 
 const currentYear = new Date().getFullYear();
 
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const getCurrentPeriod = () => {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  return `${today.getDate() <= 15 ? 'Q1' : 'Q2'}-${month}`;
+};
+
+const getPeriodLabel = (period: string, year: number) => {
+  if (period === 'all') return 'Todo el año';
+  const [half, month] = period.split('-');
+  const monthIdx = parseInt(month, 10) - 1;
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const range = half === 'Q1' ? '01 al 15' : `16 al ${daysInMonth}`;
+  return `${half === 'Q1' ? '1ª' : '2ª'} quincena de ${MONTH_NAMES[monthIdx]} (${range})`;
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
   const [activeTab, setActiveTab] = useState<'db' | 'as' | 'bi' | 'cq' | 'dt' | 'tm' | 'rk'>('db');
@@ -40,7 +57,7 @@ export default function App() {
   const [seasonConfig, setSeasonConfig] = useState<SeasonConfig | undefined>(undefined);
   const [hmMode, setHmMode] = useState<'a' | 'b' | 'r'>('a');
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
-  const [daysFilter, setDaysFilter] = useState<number>(15);
+  const [periodFilter, setPeriodFilter] = useState<string>(getCurrentPeriod());
   const [asDate, setAsDate] = useState(DT[0]);
   const [biDate, setBiDate] = useState(DT[0]);
   const [asInputs, setAsInputs] = useState<Record<string, string>>({});
@@ -158,22 +175,15 @@ export default function App() {
   }, [filteredCrews, selectedCrew]);
 
   const filteredDT = useMemo(() => {
-    if (daysFilter === 365) return activeDT;
-    let lastIndex = activeDT.length - 1;
-    for (let i = activeDT.length - 1; i >= 0; i--) {
-      const date = activeDT[i];
-      const hasData = filteredCrews.some((crew: string) => {
-        const record = getRecord(harvestData, crew, date);
-        return record.attendance !== undefined || record.bins !== undefined;
-      });
-      if (hasData) {
-        lastIndex = i;
-        break;
-      }
-    }
-    const startIndex = Math.max(0, lastIndex - daysFilter + 1);
-    return activeDT.slice(startIndex, lastIndex + 1);
-  }, [daysFilter, filteredCrews, harvestData, activeDT]);
+    if (periodFilter === 'all') return activeDT;
+    const [half, month] = periodFilter.split('-');
+    return activeDT.filter((date) => {
+      const [dayStr, monthStr] = date.split('/');
+      if (monthStr !== month) return false;
+      const day = parseInt(dayStr, 10);
+      return half === 'Q1' ? day <= 15 : day >= 16;
+    });
+  }, [periodFilter, activeDT]);
 
   const metrics = useDashboardMetrics({
     filteredCrews,
@@ -346,7 +356,7 @@ export default function App() {
     const infoFont = { italic: true, color: { rgb: '4A5568' }, name: 'Calibri', sz: 10 };
     const rowEven = { fgColor: { rgb: 'F7FAFC' } };
 
-    const periodLabel = daysFilter === 365 ? 'Todo el año' : `Últimos ${daysFilter} días`;
+    const periodLabel = getPeriodLabel(periodFilter, campaignYear);
     const companyLabel = selectedCompany === 'all' ? 'Consolidado' : selectedCompany;
     const rangeLabel = filteredDT.length > 0 ? `${filteredDT[0]} → ${filteredDT[filteredDT.length - 1]}` : '—';
     const exportDate = formatDateKey(new Date());
@@ -451,7 +461,8 @@ export default function App() {
 
     const wb = XLSXStyle.utils.book_new();
     XLSXStyle.utils.book_append_sheet(wb, ws, 'Datos');
-    XLSXStyle.writeFile(wb, `Cosecha_${campaignYear}_${companyLabel.replace(/[^a-zA-Z0-9]/g, '_')}_${daysFilter}d.xlsx`);
+    const periodSlug = periodFilter === 'all' ? 'anio' : periodFilter.replace('-', '_');
+    XLSXStyle.writeFile(wb, `Cosecha_${campaignYear}_${companyLabel.replace(/[^a-zA-Z0-9]/g, '_')}_${periodSlug}.xlsx`);
   };
 
   const normalizeImportDate = (raw: string | number | Date): string | null => {
@@ -615,14 +626,21 @@ export default function App() {
           <div className="flex items-center gap-2 bg-brand-neutral px-4 py-2 rounded-full border border-gray-200">
             <span className="text-xs font-bold text-brand-secondary">Período:</span>
             <select
-              value={daysFilter}
-              onChange={(e) => setDaysFilter(Number(e.target.value))}
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
               className="bg-transparent text-xs font-bold text-brand-primary outline-none cursor-pointer"
             >
-              <option value={7}>Últimos 7 días</option>
-              <option value={15}>Últimos 15 días</option>
-              <option value={30}>Últimos 30 días</option>
-              <option value={365}>Todo el año</option>
+              <option value="all">Todo el año</option>
+              {MONTH_NAMES.map((monthName, idx) => {
+                const month = String(idx + 1).padStart(2, '0');
+                const daysInMonth = new Date(campaignYear, idx + 1, 0).getDate();
+                return (
+                  <optgroup key={month} label={`— ${monthName} —`}>
+                    <option value={`Q1-${month}`}>1ª quincena  ·  01 al 15</option>
+                    <option value={`Q2-${month}`}>2ª quincena  ·  16 al {daysInMonth}</option>
+                  </optgroup>
+                );
+              })}
             </select>
           </div>
           <div className="flex items-center gap-2 bg-brand-neutral px-4 py-2 rounded-full border border-gray-200">

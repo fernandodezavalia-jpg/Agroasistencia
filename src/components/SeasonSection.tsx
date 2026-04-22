@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { monthNames } from '../lib/harvestData';
 import type { SeasonConfig } from '../lib/harvestData';
 
@@ -26,6 +26,11 @@ export default function SeasonSection({
   const [monthlyTarget, setMonthlyTarget] = useState(seasonConfig?.monthlyTarget ?? 0);
   const [quincenalTarget, setQuincenalTarget] = useState(seasonConfig?.quincenalTarget ?? 0);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setMonthlyTarget(seasonConfig?.monthlyTarget ?? 0);
+    setQuincenalTarget(seasonConfig?.quincenalTarget ?? 0);
+  }, [seasonConfig?.monthlyTarget, seasonConfig?.quincenalTarget]);
 
   const handleSave = () => {
     onSave({ monthlyTarget, quincenalTarget });

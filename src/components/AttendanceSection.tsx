@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { monthNames, displayCrewName, getAttendance } from '../lib/harvestData';
 import type { HarvestData } from '../lib/harvestData';
 
@@ -52,6 +52,11 @@ export default function AttendanceSection({
   dayW,
 }: AttendanceSectionProps) {
   const currentMonth = asDate.split('/')[1];
+
+  const datesWithAttendance = useMemo(
+    () => new Set(calendarDT.filter(date => filteredCrews.some(crew => getAttendance(harvestData, crew, date) !== null))),
+    [calendarDT, filteredCrews, harvestData],
+  );
 
   const crewList = filteredCrews.length === 0 ? (
     <div className="rounded-[24px] border border-dashed border-gray-300 bg-slate-50/90 p-8 text-center text-sm font-bold text-brand-secondary">
@@ -222,9 +227,9 @@ export default function AttendanceSection({
         <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
           <p className="text-xs text-brand-secondary font-bold mb-6 tracking-widest uppercase">Cobertura de Asistencia</p>
           <div className="flex flex-wrap gap-2 mb-6">
-            {calendarDT.filter((date) => date.split('/')[1] === currentMonth).map((date) => {
-              const index = calendarDT.indexOf(date);
-              const hasAttendance = filteredCrews.some((crew) => getAttendance(harvestData, crew, date) !== null);
+            {calendarDT.map((date, index) => {
+              if (date.split('/')[1] !== currentMonth) return null;
+              const hasAttendance = datesWithAttendance.has(date);
               const isSunday = calendarSN[index] === 1;
 
               return (
@@ -233,8 +238,8 @@ export default function AttendanceSection({
                   onClick={() => setAsDate(date)}
                   className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors select-none ${isSunday ? 'bg-[#E2E8F0] hover:bg-[#d5e5f2]' : date === asDate ? 'bg-brand-primary border border-brand-primary shadow-md' : 'bg-white border border-gray-200 hover:border-gray-400'}`}
                 >
-                  <span className={`text-[10px] font-medium ${isSunday ? 'text-brand-secondary' : 'text-gray-400'}`}>{date.split('/')[0]}</span>
-                  <span className={`text-xs font-bold ${isSunday ? 'text-brand-secondary' : 'text-gray-300'}`}>{isSunday ? 'D' : hasAttendance ? dayW(date) : '·'}</span>
+                  <span className={`text-[10px] font-medium ${isSunday ? 'text-brand-secondary' : date === asDate ? 'text-white/70' : 'text-gray-400'}`}>{date.split('/')[0]}</span>
+                  <span className={`text-xs font-bold ${isSunday ? 'text-brand-secondary' : date === asDate ? 'text-white' : 'text-gray-300'}`}>{isSunday ? 'D' : hasAttendance ? dayW(date) : '·'}</span>
                 </div>
               );
             })}
