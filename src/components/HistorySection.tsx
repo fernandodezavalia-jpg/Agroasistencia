@@ -19,6 +19,7 @@ interface Props {
   historicalData: Record<number, CampaignDoc | null>;
   isLoading: boolean;
   campaignYear: number;
+  preselectedCompany?: string;
 }
 
 interface YearStats {
@@ -109,6 +110,7 @@ export default function HistorySection({
   historicalData,
   isLoading,
   campaignYear,
+  preselectedCompany,
 }: Props) {
   const [viewMode, setViewMode] = useState<'crew' | 'company'>('crew');
   const [selectedCompany, setSelectedCompany] = useState<string>('');
@@ -145,8 +147,12 @@ export default function HistorySection({
 
   // Inicializar selecciones cuando llegan los datos
   useEffect(() => {
-    if (companies.length > 0 && !selectedCompany) setSelectedCompany(companies[0]);
-  }, [companies]);
+    if (preselectedCompany && companies.includes(preselectedCompany)) {
+      setSelectedCompany(preselectedCompany);
+    } else if (companies.length > 0 && !selectedCompany) {
+      setSelectedCompany(companies[0]);
+    }
+  }, [companies, preselectedCompany]);
 
   useEffect(() => {
     const list = selectedCompany

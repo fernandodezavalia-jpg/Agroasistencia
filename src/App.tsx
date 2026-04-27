@@ -205,6 +205,23 @@ export default function App() {
     });
   }, [periodFilter, activeDT]);
 
+  // Sincronizar date pickers al período cuando la fecha queda fuera del rango
+  useEffect(() => {
+    if (filteredDT.length === 0) return;
+    if (!filteredDT.includes(asDate)) {
+      const first = filteredDT.find((d) => activeSN[activeDT.indexOf(d)] === 0);
+      if (first) setAsDate(first);
+    }
+  }, [filteredDT]);
+
+  useEffect(() => {
+    if (filteredDT.length === 0) return;
+    if (!filteredDT.includes(biDate)) {
+      const first = filteredDT.find((d) => activeSN[activeDT.indexOf(d)] === 0);
+      if (first) setBiDate(first);
+    }
+  }, [filteredDT]);
+
   const metrics = useDashboardMetrics({
     filteredCrews,
     filteredDT,
@@ -797,6 +814,29 @@ export default function App() {
         ))}
       </div>
 
+      {/* Indicador de filtros activos */}
+      {(selectedCompany !== 'all' || periodFilter !== 'all') && (
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <span className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider">Mostrando:</span>
+          {selectedCompany !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-full text-brand-primary shadow-sm">
+              🏢 {selectedCompany.split(' ').slice(0, 2).join(' ')}
+            </span>
+          )}
+          {periodFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-white border border-gray-200 px-3 py-1.5 rounded-full text-brand-primary shadow-sm">
+              📅 {getPeriodLabel(periodFilter, campaignYear)}
+            </span>
+          )}
+          <button
+            onClick={() => { setSelectedCompany('all'); setPeriodFilter('all'); }}
+            className="text-[10px] font-bold text-brand-secondary hover:text-red-500 transition-colors underline underline-offset-2"
+          >
+            limpiar filtros
+          </button>
+        </div>
+      )}
+
       {activeTab === 'db' && (
         <DashboardSection
           totalW={metrics.totalW}
@@ -898,10 +938,10 @@ export default function App() {
 
       {activeTab === 'rk' && (
         <RankingSection
-          crews={crews}
+          crews={filteredCrews}
           crewCompanies={crewCompanies}
           harvestData={harvestData}
-          activeDT={activeDT}
+          activeDT={filteredDT}
         />
       )}
 
@@ -912,6 +952,7 @@ export default function App() {
           historicalData={historicalData}
           isLoading={historyLoading}
           campaignYear={campaignYear}
+          preselectedCompany={selectedCompany !== 'all' ? selectedCompany : undefined}
         />
       )}
 
