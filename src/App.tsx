@@ -576,7 +576,10 @@ export default function App() {
           const rawDate = normalizeImportDate(row['Día'] ?? row['Dia'] ?? row['Date'] ?? '') ?? '';
           const rawCrew = String(row['Cuadrilla'] ?? row['cuadrilla'] ?? row['Crew'] ?? '').trim();
           const rawAttendance = row['Asistencia'] ?? row['Attendance'] ?? '';
-          const rawBins = row['Bins/Bolsones'] ?? row['Bins'] ?? row['bins'] ?? '';
+          // Nuevo formato: columnas separadas por tipo; legacy: Bins/Bolsones
+          const rawBinsInd = row['Bins Industria'] ?? row['bins industria'] ?? '';
+          const rawBinsExp = row['Bins Exportación'] ?? row['Bins Exportacion'] ?? row['bins exportacion'] ?? '';
+          const rawBinsLegacy = row['Bins/Bolsones'] ?? row['Bins'] ?? row['bins'] ?? '';
           const rawBus = String(row['Colectivo'] ?? row['Bus'] ?? '').trim().toLowerCase();
           const rawForeman = String(row['Capataz'] ?? row['Foreman'] ?? '').trim().toLowerCase();
           const rawCompany = String(row['Empresa'] ?? row['Company'] ?? '').trim().toLowerCase();
@@ -599,9 +602,21 @@ export default function App() {
 
           const record: HarvestRecord = {};
           const attendanceValue = Number(rawAttendance);
-          const binsValue = Number(rawBins);
           if (!Number.isNaN(attendanceValue) && rawAttendance !== '') record.attendance = attendanceValue;
-          if (!Number.isNaN(binsValue) && rawBins !== '') { record.bins = binsValue; withBins += 1; }
+
+          const binsIndValue = Number(rawBinsInd);
+          const binsExpValue = Number(rawBinsExp);
+          const binsLegacyValue = Number(rawBinsLegacy);
+          const hasSplitImport = rawBinsInd !== '' || rawBinsExp !== '';
+          if (hasSplitImport) {
+            if (!Number.isNaN(binsIndValue) && rawBinsInd !== '') record.binsIndustria = binsIndValue;
+            if (!Number.isNaN(binsExpValue) && rawBinsExp !== '') record.binsExportacion = binsExpValue;
+            withBins += 1;
+          } else if (!Number.isNaN(binsLegacyValue) && rawBinsLegacy !== '') {
+            record.bins = binsLegacyValue;
+            withBins += 1;
+          }
+
           const busVal = String(rawBus);
           const foremanVal = String(rawForeman);
           if (busVal.startsWith('s') || busVal === '1') { record.bus = true; withBus += 1; }
