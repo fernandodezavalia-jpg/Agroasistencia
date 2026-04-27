@@ -1,6 +1,8 @@
 import React from 'react';
-import { monthNames, displayCrewName, getAttendance, getBins } from '../lib/harvestData';
+import { monthNames, displayCrewName, getAttendance, getBins, getBinsIndustria, getBinsExportacion } from '../lib/harvestData';
 import type { HarvestData } from '../lib/harvestData';
+
+export type BiInputs = Record<string, { industria: string; exportacion: string }>;
 
 interface BinsSectionProps {
   harvestData: HarvestData;
@@ -9,8 +11,8 @@ interface BinsSectionProps {
   calendarSN: number[];
   biDate: string;
   setBiDate: (value: string) => void;
-  biInputs: Record<string, string>;
-  setBiInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  biInputs: BiInputs;
+  setBiInputs: React.Dispatch<React.SetStateAction<BiInputs>>;
   handleSaveBi: () => void;
   handleClearBi: () => void;
   biMsg: { text: string; color: string };
@@ -66,6 +68,16 @@ export default function BinsSection({
           </div>
         </div>
 
+        {/* Leyenda de tipos */}
+        <div className="flex gap-4 mb-4 text-xs font-bold text-brand-secondary">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#1B4332] inline-block"></span>Industria
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#92400E] inline-block"></span>Exportación
+          </span>
+        </div>
+
         {filteredCrews.filter((crew) => getAttendance(harvestData, crew, biDate) !== null).length === 0 ? (
           <div className="bg-slate-50 rounded-3xl p-6 text-center border border-gray-200 shadow-sm">
             <p className="text-sm font-bold text-brand-secondary m-0">No hay asistencia cargada para este día.</p>
@@ -73,31 +85,72 @@ export default function BinsSection({
         ) : (
           <div className="flex flex-col gap-3">
             {filteredCrews.filter((crew) => getAttendance(harvestData, crew, biDate) !== null).map((crew) => {
-              const filled = getBins(harvestData, crew, biDate) !== null;
+              const totalBins = getBins(harvestData, crew, biDate);
+              const indBins = getBinsIndustria(harvestData, crew, biDate);
+              const expBins = getBinsExportacion(harvestData, crew, biDate);
               const attendance = getAttendance(harvestData, crew, biDate);
+              const inputs = biInputs[crew] ?? { industria: '', exportacion: '' };
+
+              const hasSplitData = indBins !== null || expBins !== null;
+              const hasLegacyData = totalBins !== null && !hasSplitData;
 
               return (
-                <div key={crew} className="flex items-center justify-between p-4 bg-slate-50/90 rounded-[24px] border border-gray-200/80 hover:border-brand-primary/20 transition-all shadow-sm">
-                  <div>
-                    <p className="text-sm font-bold text-brand-primary m-0">{displayCrewName(crew)}</p>
-                    <p className="text-xs text-brand-secondary mt-0.5">{attendance} trabajadores</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {filled ? (
-                      <span className="text-xs text-[#1B4332] font-bold whitespace-nowrap bg-[#1B4332]/10 px-2 py-1 rounded-md">✓ cargado</span>
-                    ) : (
-                      <span className="text-xs text-gray-400 whitespace-nowrap">pendiente</span>
+                <div key={crew} className="flex flex-col gap-3 p-4 bg-slate-50/90 rounded-[24px] border border-gray-200/80 hover:border-brand-primary/20 transition-all shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-brand-primary m-0">{displayCrewName(crew)}</p>
+                      <p className="text-xs text-brand-secondary mt-0.5">{attendance} trabajadores</p>
+                    </div>
+                    {(hasSplitData || hasLegacyData) && (
+                      <div className="text-right">
+                        {hasSplitData ? (
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-xs text-[#1B4332] font-bold bg-[#1B4332]/10 px-2 py-0.5 rounded-md">
+                              ✓ Total: {totalBins}
+                            </span>
+                            <span className="text-[10px] text-brand-secondary">
+                              I: {indBins ?? 0} · E: {expBins ?? 0}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[#1B4332] font-bold bg-[#1B4332]/10 px-2 py-1 rounded-md">
+                            ✓ {totalBins} bins
+                          </span>
+                        )}
+                      </div>
                     )}
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      placeholder="bines"
-                      value={biInputs[crew] || ''}
-                      onChange={(e) => setBiInputs({ ...biInputs, [crew]: e.target.value })}
-                      className="w-[80px] text-center font-mono text-sm font-bold border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 transition-all"
-                      aria-label={`Cantidad de bines para ${displayCrewName(crew)}`}
-                    />
+                    {!hasSplitData && !hasLegacyData && (
+                      <span className="text-xs text-gray-400">pendiente</span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#1B4332] uppercase tracking-wider block mb-1">Industria</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        placeholder="bines"
+                        value={inputs.industria}
+                        onChange={(e) => setBiInputs((prev) => ({ ...prev, [crew]: { ...inputs, industria: e.target.value } }))}
+                        className="w-full text-center font-mono text-sm font-bold border border-[#1B4332]/20 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#1B4332]/20 transition-all"
+                        aria-label={`Bins industria para ${displayCrewName(crew)}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#92400E] uppercase tracking-wider block mb-1">Exportación</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        placeholder="bines"
+                        value={inputs.exportacion}
+                        onChange={(e) => setBiInputs((prev) => ({ ...prev, [crew]: { ...inputs, exportacion: e.target.value } }))}
+                        className="w-full text-center font-mono text-sm font-bold border border-[#92400E]/20 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#92400E]/20 transition-all"
+                        aria-label={`Bins exportación para ${displayCrewName(crew)}`}
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -136,6 +189,7 @@ export default function BinsSection({
               );
             }
 
+            const totalBins = filteredCrews.reduce((sum, crew) => sum + (getBins(harvestData, crew, date) || 0), 0);
             const hasBins = filteredCrews.some((crew) => getBins(harvestData, crew, date) !== null);
             if (hasBins) {
               return (
@@ -145,7 +199,7 @@ export default function BinsSection({
                   className="w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 bg-brand-secondary cursor-pointer hover:bg-[#323a46] transition-colors select-none shadow-sm"
                 >
                   <span className="text-[10px] text-white/70 font-medium">{date.split('/')[0]}</span>
-                  <span className="text-xs text-white font-bold">{filteredCrews.reduce((sum, crew) => sum + (getBins(harvestData, crew, date) || 0), 0)}</span>
+                  <span className="text-xs text-white font-bold">{totalBins}</span>
                 </div>
               );
             }

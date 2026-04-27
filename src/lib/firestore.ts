@@ -1,4 +1,4 @@
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { HarvestData, SeasonConfig } from './harvestData';
 
@@ -35,6 +35,17 @@ export function subscribeCampaign(
   return onSnapshot(ref, (snap) => {
     onData(snap.exists() ? parseDoc(snap.data()) : null);
   }, onError);
+}
+
+export async function fetchHistoricalCampaigns(years: number[]): Promise<Record<number, CampaignDoc | null>> {
+  const results: Record<number, CampaignDoc | null> = {};
+  await Promise.all(
+    years.map(async (year) => {
+      const snap = await getDoc(doc(db, 'campaigns', String(year)));
+      results[year] = snap.exists() ? parseDoc(snap.data()) : null;
+    }),
+  );
+  return results;
 }
 
 export async function saveCampaign(year: number, data: CampaignDoc): Promise<void> {

@@ -1,6 +1,8 @@
 export type HarvestRecord = {
   attendance?: number;
-  bins?: number;
+  bins?: number; // legacy — reemplazado por binsIndustria + binsExportacion
+  binsIndustria?: number;
+  binsExportacion?: number;
   bus?: boolean;
   foreman?: boolean;
 };
@@ -60,7 +62,20 @@ export function getAttendance(data: HarvestData, crew: string, date: string): nu
 }
 
 export function getBins(data: HarvestData, crew: string, date: string): number | null {
-  const value = getRecord(data, crew, date).bins;
+  const record = getRecord(data, crew, date);
+  if (record.binsIndustria !== undefined || record.binsExportacion !== undefined) {
+    return (record.binsIndustria ?? 0) + (record.binsExportacion ?? 0);
+  }
+  return typeof record.bins === 'number' ? record.bins : null;
+}
+
+export function getBinsIndustria(data: HarvestData, crew: string, date: string): number | null {
+  const value = getRecord(data, crew, date).binsIndustria;
+  return typeof value === 'number' ? value : null;
+}
+
+export function getBinsExportacion(data: HarvestData, crew: string, date: string): number | null {
+  const value = getRecord(data, crew, date).binsExportacion;
   return typeof value === 'number' ? value : null;
 }
 

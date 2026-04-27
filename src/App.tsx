@@ -5,6 +5,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import AttendanceSection from './components/AttendanceSection';
 import BinsSection from './components/BinsSection';
+import type { BiInputs } from './components/BinsSection';
 import CrewSection from './components/CrewSection';
 import DashboardSection from './components/DashboardSection';
 import HeatmapSection from './components/HeatmapSection';
@@ -12,15 +13,19 @@ import ConfirmModal from './components/ConfirmModal';
 import LoginScreen from './components/LoginScreen';
 import SeasonSection from './components/SeasonSection';
 import RankingSection from './components/RankingSection';
+import HistorySection from './components/HistorySection';
 import { useDashboardMetrics } from './hooks/useDashboardMetrics';
 import { auth } from './lib/firebase';
-import { subscribeCampaign, saveCampaign } from './lib/firestore';
+import { subscribeCampaign, saveCampaign, fetchHistoricalCampaigns } from './lib/firestore';
+import type { CampaignDoc } from './lib/firestore';
 import {
   COMPANIES,
   DT,
   generateCalendarForYear,
   getAttendance,
   getBins,
+  getBinsIndustria,
+  getBinsExportacion,
   getBus,
   getForeman,
   getRecord,
@@ -50,7 +55,7 @@ const getPeriodLabel = (period: string, year: number) => {
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
-  const [activeTab, setActiveTab] = useState<'db' | 'as' | 'bi' | 'cq' | 'dt' | 'tm' | 'rk'>('db');
+  const [activeTab, setActiveTab] = useState<'db' | 'as' | 'bi' | 'cq' | 'dt' | 'tm' | 'rk' | 'hs'>('db');
   const [campaignYear, setCampaignYear] = useState<number>(currentYear);
   const [crews, setCrews] = useState<string[]>([]);
   const [crewCompanies, setCrewCompanies] = useState<Record<string, string>>({});
@@ -64,7 +69,9 @@ export default function App() {
   const [asInputs, setAsInputs] = useState<Record<string, string>>({});
   const [busInputs, setBusInputs] = useState<Record<string, boolean>>({});
   const [foremenInputs, setForemenInputs] = useState<Record<string, boolean>>({});
-  const [biInputs, setBiInputs] = useState<Record<string, string>>({});
+  const [biInputs, setBiInputs] = useState<BiInputs>({});
+  const [historicalData, setHistoricalData] = useState<Record<number, CampaignDoc | null>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [asMsg, setAsMsg] = useState({ text: '', color: '' });
   const [biMsg, setBiMsg] = useState({ text: '', color: '' });
   const [cqMsg, setCqMsg] = useState({ text: '', color: '' });
@@ -155,6 +162,17 @@ export default function App() {
     };
   }, [crews, crewCompanies, harvestData, seasonConfig, campaignYear, user]);
 
+  // Carga historial cuando el usuario abre el tab por primera vez o cambia de año de campaña
+  useEffect(() => {
+    if (activeTab !== 'hs' || !user) return;
+    setHistoryLoading(true);
+    const years = [campaignYear - 4, campaignYear - 3, campaignYear - 2, campaignYear - 1, campaignYear];
+    fetchHistoricalCampaigns(years).then((data) => {
+      setHistoricalData(data);
+      setHistoryLoading(false);
+    });
+  }, [activeTab, campaignYear, user]);
+
   const showMsg = (setter: React.Dispatch<React.SetStateAction<{ text: string; color: string }>>, text: string, color: string) => {
     setter({ text, color });
     setTimeout(() => setter({ text: '', color: '' }), 2500);
@@ -217,10 +235,16 @@ export default function App() {
   }, [asDate, crews, harvestData]);
 
   useEffect(() => {
-    const newBiInputs: Record<string, string> = {};
+    const newBiInputs: BiInputs = {};
     crews.forEach((crew) => {
-      const bins = getBins(harvestData, crew, biDate);
-      newBiInputs[crew] = bins !== null ? String(bins) : '';
+      const rec = getRecord(harvestData, crew, biDate);
+      const hasNewFields = rec.binsIndustria !== undefined || rec.binsExportacion !== undefined;
+      newBiInputs[crew] = {
+        industria: rec.binsIndustria !== undefined
+          ? String(rec.binsIndustria)
+          : (!hasNewFields && rec.bins !== undefined ? String(rec.bins) : ''),
+        exportacion: rec.binsExportacion !== undefined ? String(rec.binsExportacion) : '',
+      };
     });
     setBiInputs(newBiInputs);
   }, [biDate, crews, harvestData]);
@@ -282,12 +306,25 @@ export default function App() {
     crews.forEach((crew) => {
       if (getAttendance(nextData, crew, biDate) === null) return;
       const currentRecord = { ...getRecord(nextData, crew, biDate) };
-      const raw = biInputs[crew]?.trim();
-      if (!raw) {
-        delete currentRecord.bins;
+      const rawInd = biInputs[crew]?.industria.trim() ?? '';
+      const rawExp = biInputs[crew]?.exportacion.trim() ?? '';
+      delete currentRecord.bins; // eliminar campo legacy al guardar con nuevo formato
+      if (!rawInd && !rawExp) {
+        delete currentRecord.binsIndustria;
+        delete currentRecord.binsExportacion;
       } else {
-        const value = parseInt(raw, 10);
-        if (!isNaN(value) && value >= 0) currentRecord.bins = value;
+        if (rawInd) {
+          const v = parseInt(rawInd, 10);
+          if (!isNaN(v) && v >= 0) currentRecord.binsIndustria = v;
+        } else {
+          delete currentRecord.binsIndustria;
+        }
+        if (rawExp) {
+          const v = parseInt(rawExp, 10);
+          if (!isNaN(v) && v >= 0) currentRecord.binsExportacion = v;
+        } else {
+          delete currentRecord.binsExportacion;
+        }
       }
       setRecord(nextData, crew, biDate, currentRecord);
     });
@@ -304,6 +341,8 @@ export default function App() {
         crews.forEach((crew) => {
           const currentRecord = { ...getRecord(nextData, crew, biDate) };
           delete currentRecord.bins;
+          delete currentRecord.binsIndustria;
+          delete currentRecord.binsExportacion;
           setRecord(nextData, crew, biDate, currentRecord);
         });
         setHarvestData(nextData);
@@ -363,6 +402,13 @@ export default function App() {
     const rangeLabel = filteredDT.length > 0 ? `${filteredDT[0]} → ${filteredDT[filteredDT.length - 1]}` : '—';
     const exportDate = formatDateKey(new Date());
 
+    const hasSplitBins = filteredCrews.some((crew) =>
+      filteredDT.some((date) => {
+        const rec = getRecord(harvestData, crew, date);
+        return rec.binsIndustria !== undefined || rec.binsExportacion !== undefined;
+      }),
+    );
+
     const rows: Array<Record<string, string | number>> = [];
     filteredDT.forEach((date) => {
       filteredCrews.forEach((crew) => {
@@ -371,14 +417,21 @@ export default function App() {
         const bus = getBus(harvestData, crew, date) ? 1 : 0;
         const foreman = getForeman(harvestData, crew, date) ? 1 : 0;
         if (attendance !== null || bins !== null || bus || foreman) {
-          rows.push({
+          const row: Record<string, string | number> = {
             Día: date,
             Cuadrilla: crew.charAt(0) + crew.slice(1).toLowerCase(),
             Capataz: foreman,
             Colectivo: bus,
             Asistencia: attendance ?? 0,
-            'Bins/Bolsones': bins ?? 0,
-          });
+          };
+          if (hasSplitBins) {
+            row['Bins Industria'] = getBinsIndustria(harvestData, crew, date) ?? 0;
+            row['Bins Exportación'] = getBinsExportacion(harvestData, crew, date) ?? 0;
+            row['Bins Total'] = bins ?? 0;
+          } else {
+            row['Bins/Bolsones'] = bins ?? 0;
+          }
+          rows.push(row);
         }
       });
     });
@@ -387,7 +440,11 @@ export default function App() {
     const sumCapataz = rows.reduce((s, r) => s + (r['Capataz'] as number), 0);
     const sumColectivo = rows.reduce((s, r) => s + (r['Colectivo'] as number), 0);
     const sumAsistencia = rows.reduce((s, r) => s + (r['Asistencia'] as number), 0);
-    const sumBins = rows.reduce((s, r) => s + (r['Bins/Bolsones'] as number), 0);
+    const sumBins = hasSplitBins
+      ? rows.reduce((s, r) => s + (r['Bins Total'] as number), 0)
+      : rows.reduce((s, r) => s + (r['Bins/Bolsones'] as number), 0);
+    const sumBinsInd = hasSplitBins ? rows.reduce((s, r) => s + (r['Bins Industria'] as number), 0) : 0;
+    const sumBinsExp = hasSplitBins ? rows.reduce((s, r) => s + (r['Bins Exportación'] as number), 0) : 0;
 
     const ws = XLSXStyle.utils.aoa_to_sheet([]);
 
@@ -401,7 +458,9 @@ export default function App() {
     infoRows.forEach((row) => XLSXStyle.utils.sheet_add_aoa(ws, [row], { origin: -1 }));
 
     const HEADER_ROW = 5;
-    const headers = ['Día', 'Cuadrilla', 'Capataz', 'Colectivo', 'Asistencia', 'Bins/Bolsones'];
+    const headers = hasSplitBins
+      ? ['Día', 'Cuadrilla', 'Capataz', 'Colectivo', 'Asistencia', 'Bins Industria', 'Bins Exportación', 'Bins Total']
+      : ['Día', 'Cuadrilla', 'Capataz', 'Colectivo', 'Asistencia', 'Bins/Bolsones'];
     XLSXStyle.utils.sheet_add_aoa(ws, [headers], { origin: -1 });
 
     // Style header row
@@ -436,7 +495,9 @@ export default function App() {
     XLSXStyle.utils.sheet_add_aoa(ws, [[]], { origin: -1 });
 
     // Totals row
-    const totalsRow = ['TOTALES', '', sumCapataz, sumColectivo, sumAsistencia, sumBins];
+    const totalsRow = hasSplitBins
+      ? ['TOTALES', '', sumCapataz, sumColectivo, sumAsistencia, sumBinsInd, sumBinsExp, sumBins]
+      : ['TOTALES', '', sumCapataz, sumColectivo, sumAsistencia, sumBins];
     XLSXStyle.utils.sheet_add_aoa(ws, [totalsRow], { origin: -1 });
     const totalsRowIdx = HEADER_ROW + rows.length + 1;
     totalsRow.forEach((val, colIdx) => {
@@ -457,9 +518,9 @@ export default function App() {
     }
 
     // Column widths
-    ws['!cols'] = [
-      { wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 },
-    ];
+    ws['!cols'] = hasSplitBins
+      ? [{ wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 }]
+      : [{ wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
 
     const wb = XLSXStyle.utils.book_new();
     XLSXStyle.utils.book_append_sheet(wb, ws, 'Datos');
@@ -708,6 +769,7 @@ export default function App() {
           { id: 'dt', label: 'Detalle', icon: '📅' },
           { id: 'tm', label: 'Temporada', icon: '🎯' },
           { id: 'rk', label: 'Ranking', icon: '🏆' },
+          { id: 'hs', label: 'Historial', icon: '📈' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -825,6 +887,16 @@ export default function App() {
           crewCompanies={crewCompanies}
           harvestData={harvestData}
           activeDT={activeDT}
+        />
+      )}
+
+      {activeTab === 'hs' && (
+        <HistorySection
+          crews={crews}
+          crewCompanies={crewCompanies}
+          historicalData={historicalData}
+          isLoading={historyLoading}
+          campaignYear={campaignYear}
         />
       )}
 
