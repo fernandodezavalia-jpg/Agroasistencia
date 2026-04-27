@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { getAttendance, getBins, getBus, getForeman } from '../lib/harvestData';
+import { getAttendance, getBins, getBinsIndustria, getBinsExportacion, getBus, getForeman } from '../lib/harvestData';
 import type { HarvestData } from '../lib/harvestData';
 
 export interface CrewSemaforoItem {
@@ -326,6 +326,17 @@ export function useDashboardMetrics({
             sum + filteredDT.reduce((v, date) => v + (getBins(harvestData, crew, date) ?? 0), 0),
           0,
         );
+        const compBInd = compCrews.reduce(
+          (sum, crew) =>
+            sum + filteredDT.reduce((v, date) => v + (getBinsIndustria(harvestData, crew, date) ?? 0), 0),
+          0,
+        );
+        const compBExp = compCrews.reduce(
+          (sum, crew) =>
+            sum + filteredDT.reduce((v, date) => v + (getBinsExportacion(harvestData, crew, date) ?? 0), 0),
+          0,
+        );
+        const hasSplitData = compBInd > 0 || compBExp > 0;
         const rendValues = compCrews
           .map((crew) => {
             let tb = 0, ta = 0;
@@ -343,9 +354,14 @@ export function useDashboardMetrics({
           crewCount: compCrews.length,
           totalW: compW,
           totalB: compB,
+          totalBInd: compBInd,
+          totalBExp: compBExp,
+          hasSplitData,
           avgRend: rendValues.length > 0
             ? (rendValues.reduce((s, v) => s + v, 0) / rendValues.length).toFixed(2)
             : '—',
+          rendInd: hasSplitData && compW > 0 ? Number((compBInd / compW).toFixed(2)) : null,
+          rendExp: hasSplitData && compW > 0 ? Number((compBExp / compW).toFixed(2)) : null,
         };
       }),
     [companies, filteredCrews, crewCompanies, filteredDT, harvestData],

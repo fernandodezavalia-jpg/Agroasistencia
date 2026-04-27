@@ -17,7 +17,12 @@ export interface CompanyMetric {
   crewCount: number;
   totalW: number;
   totalB: number;
+  totalBInd: number;
+  totalBExp: number;
+  hasSplitData: boolean;
   avgRend: string;
+  rendInd: number | null;
+  rendExp: number | null;
 }
 
 interface DashboardSectionProps {
@@ -369,9 +374,13 @@ export default function DashboardSection({
       {companyMetrics.length >= 2 && (
         <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 mb-6">
           <p className="text-xs text-brand-secondary font-bold mb-6 tracking-widest uppercase">Comparativa por Empresa</p>
+
+          {/* Tarjetas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             {companyMetrics.map((m) => {
               const colors = COMPANY_COLORS[m.company] ?? fallbackColor;
+              const indPct = m.hasSplitData && m.totalB > 0 ? Math.round((m.totalBInd / m.totalB) * 100) : null;
+              const expPct = indPct !== null ? 100 - indPct : null;
               return (
                 <div key={m.company} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
@@ -380,52 +389,99 @@ export default function DashboardSection({
                     </span>
                     <span className="text-xs text-brand-secondary font-medium">{m.crewCount} cuadrillas</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+
+                  {/* Métricas principales */}
+                  <div className="grid grid-cols-3 gap-3 mb-4">
                     <div className="text-center">
                       <p className="text-2xl font-heading font-extrabold text-brand-primary">{m.totalW.toLocaleString('es-AR')}</p>
                       <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mt-1">Jornales</p>
                     </div>
                     <div className="text-center border-x border-gray-200">
                       <p className="text-2xl font-heading font-extrabold text-brand-primary">{m.totalB > 0 ? m.totalB.toLocaleString('es-AR') : '—'}</p>
-                      <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mt-1">Bins</p>
+                      <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mt-1">Bins Total</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-heading font-extrabold text-brand-primary">{m.avgRend}</p>
-                      <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mt-1">Rend.</p>
+                      <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mt-1">Rend. total</p>
                     </div>
                   </div>
+
+                  {/* Composición y rendimiento por tipo — solo si hay datos divididos */}
+                  {m.hasSplitData && m.totalB > 0 && (
+                    <div className="border-t border-gray-100 pt-4 space-y-3">
+                      {/* Barra de composición */}
+                      <div>
+                        <div className="flex justify-between text-[10px] font-bold mb-1">
+                          <span style={{ color: '#1B4332' }}>Industria {indPct}%</span>
+                          <span style={{ color: '#92400E' }}>Exportación {expPct}%</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full overflow-hidden bg-gray-100 flex">
+                          <div className="h-full rounded-l-full" style={{ width: `${indPct}%`, background: '#1B4332' }} />
+                          <div className="h-full rounded-r-full flex-1" style={{ background: '#92400E' }} />
+                        </div>
+                      </div>
+
+                      {/* Desglose bins + rendimiento por tipo */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#1B4332]/5 rounded-xl p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#1B4332' }}>Industria</p>
+                          <p className="text-lg font-heading font-extrabold text-brand-primary">{m.totalBInd.toLocaleString('es-AR')}</p>
+                          <p className="text-[10px] text-brand-secondary mt-0.5">bins</p>
+                          {m.rendInd !== null && (
+                            <p className="text-xs font-bold mt-1" style={{ color: '#1B4332' }}>{m.rendInd} b/t</p>
+                          )}
+                        </div>
+                        <div className="bg-[#92400E]/5 rounded-xl p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: '#92400E' }}>Exportación</p>
+                          <p className="text-lg font-heading font-extrabold text-brand-primary">{m.totalBExp.toLocaleString('es-AR')}</p>
+                          <p className="text-[10px] text-brand-secondary mt-0.5">bins</p>
+                          {m.rendExp !== null && (
+                            <p className="text-xs font-bold mt-1" style={{ color: '#92400E' }}>{m.rendExp} b/t</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {companyMetrics.every((m) => m.totalB > 0) && (
-            <div className="h-[160px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={[
-                    { metric: 'Jornales', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalW])) },
-                    { metric: 'Bins', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalB])) },
-                  ]}
-                  margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="metric" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4A5568', fontFamily: 'Inter', fontWeight: 600 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#4A5568' }} dx={-5} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={((value: ValueType | undefined, name: string) => [Number(value ?? 0).toLocaleString('es-AR'), String(name ?? '')]) as any}
-                  />
-                  {companyMetrics.map((m, i) => {
-                    const clr = COMPANY_COLORS[m.company]?.primary ?? fallbackColor.primary;
-                    return (
-                      <Bar key={m.company} dataKey={m.company} fill={clr} radius={[4, 4, 0, 0]} barSize={28} opacity={i === 0 ? 1 : 0.7} />
-                    );
-                  })}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          {/* Gráfico comparativo */}
+          {companyMetrics.every((m) => m.totalB > 0) && (() => {
+            const anySplit = companyMetrics.some((m) => m.hasSplitData);
+            const chartData = anySplit
+              ? [
+                  { metric: 'Jornales', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalW])) },
+                  { metric: 'Bins Ind.', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalBInd])) },
+                  { metric: 'Bins Exp.', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalBExp])) },
+                ]
+              : [
+                  { metric: 'Jornales', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalW])) },
+                  { metric: 'Bins', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalB])) },
+                ];
+            return (
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="metric" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4A5568', fontFamily: 'Inter', fontWeight: 600 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#4A5568' }} dx={-5} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      formatter={((value: ValueType | undefined, name: string) => [Number(value ?? 0).toLocaleString('es-AR'), String(name ?? '')]) as any}
+                    />
+                    {companyMetrics.map((m, i) => {
+                      const clr = COMPANY_COLORS[m.company]?.primary ?? fallbackColor.primary;
+                      return (
+                        <Bar key={m.company} dataKey={m.company} fill={clr} radius={[4, 4, 0, 0]} barSize={24} opacity={i === 0 ? 1 : 0.7} />
+                      );
+                    })}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
