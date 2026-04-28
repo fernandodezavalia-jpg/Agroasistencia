@@ -91,8 +91,9 @@ export default function DashboardSection({
     pct >= 100 ? 'text-emerald-500' : pct >= 70 ? 'text-amber-500' : 'text-red-500';
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
+      {/* KPI Cards — Producción */}
+      <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest mb-2 ml-1">Producción</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden hover:shadow-md transition-shadow">
           <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary"></div>
           <div className="flex justify-between items-start mb-2">
@@ -128,7 +129,11 @@ export default function DashboardSection({
             <p className="text-xs text-brand-secondary mt-1 font-medium">Bins / trabajador</p>
           </div>
         </div>
+      </div>
 
+      {/* KPI Cards — Operativo */}
+      <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest mb-2 ml-1">Operativo</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden hover:shadow-md transition-shadow">
           <div className="absolute top-0 left-0 w-1 h-full bg-[#52B788]"></div>
           <div className="flex justify-between items-start mb-2">
@@ -173,7 +178,7 @@ export default function DashboardSection({
           </div>
           <div>
             <p className="text-3xl font-heading font-extrabold text-brand-primary tracking-tight">{missingTodayCrews}</p>
-            <p className="text-xs text-brand-secondary mt-1 font-medium">sin asistencia hoy</p>
+            <p className="text-xs text-brand-secondary mt-1 font-medium">cuadrillas sin registro hoy</p>
           </div>
         </div>
       </div>
@@ -210,7 +215,7 @@ export default function DashboardSection({
             ))}
           </div>
           <p className="text-xs text-brand-secondary mt-3">
-            Verde: +10% sobre el promedio · Amarillo: dentro del ±10% · Rojo: -15% o más por debajo
+            Verde: +10% o más · Amarillo: entre −15% y +10% · Rojo: −15% o más por debajo
           </p>
         </div>
       )}
@@ -447,38 +452,63 @@ export default function DashboardSection({
             })}
           </div>
 
-          {/* Gráfico comparativo */}
+          {/* Gráfico comparativo de producción */}
           {companyMetrics.every((m) => m.totalB > 0) && (() => {
             const anySplit = companyMetrics.some((m) => m.hasSplitData);
-            const chartData = anySplit
+            const binsChartData = anySplit
               ? [
-                  { metric: 'Jornales', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalW])) },
-                  { metric: 'Bins Ind.', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalBInd])) },
-                  { metric: 'Bins Exp.', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalBExp])) },
+                  { metric: 'Ind.', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalBInd])) },
+                  { metric: 'Exp.', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalBExp])) },
+                  { metric: 'Total', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalB])) },
                 ]
               : [
-                  { metric: 'Jornales', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalW])) },
                   { metric: 'Bins', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalB])) },
                 ];
+            const jornalesChartData = [
+              { metric: 'Jornales', ...Object.fromEntries(companyMetrics.map((m) => [m.company, m.totalW])) },
+            ];
             return (
-              <div className="h-[180px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                    <XAxis dataKey="metric" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4A5568', fontFamily: 'Inter', fontWeight: 600 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#4A5568' }} dx={-5} />
-                    <Tooltip
-                      contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      formatter={((value: ValueType | undefined, name: string) => [Number(value ?? 0).toLocaleString('es-AR'), String(name ?? '')]) as any}
-                    />
-                    {companyMetrics.map((m, i) => {
-                      const clr = COMPANY_COLORS[m.company]?.primary ?? fallbackColor.primary;
-                      return (
-                        <Bar key={m.company} dataKey={m.company} fill={clr} radius={[4, 4, 0, 0]} barSize={24} opacity={i === 0 ? 1 : 0.7} />
-                      );
-                    })}
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest mb-2">Producción (bins)</p>
+                  <div className="h-[160px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={binsChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                        <XAxis dataKey="metric" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4A5568', fontFamily: 'Inter', fontWeight: 600 }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#4A5568' }} dx={-5} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          formatter={((value: ValueType | undefined, name: string) => [Number(value ?? 0).toLocaleString('es-AR'), String(name ?? '')]) as any}
+                        />
+                        {companyMetrics.map((m, i) => {
+                          const clr = COMPANY_COLORS[m.company]?.primary ?? fallbackColor.primary;
+                          return <Bar key={m.company} dataKey={m.company} fill={clr} radius={[4, 4, 0, 0]} barSize={28} opacity={i === 0 ? 1 : 0.7} />;
+                        })}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest mb-2">Jornales</p>
+                  <div className="h-[160px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={jornalesChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                        <XAxis dataKey="metric" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4A5568', fontFamily: 'Inter', fontWeight: 600 }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#4A5568' }} dx={-5} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          formatter={((value: ValueType | undefined, name: string) => [Number(value ?? 0).toLocaleString('es-AR'), String(name ?? '')]) as any}
+                        />
+                        {companyMetrics.map((m, i) => {
+                          const clr = COMPANY_COLORS[m.company]?.primary ?? fallbackColor.primary;
+                          return <Bar key={m.company} dataKey={m.company} fill={clr} radius={[4, 4, 0, 0]} barSize={28} opacity={i === 0 ? 1 : 0.7} />;
+                        })}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
             );
           })()}

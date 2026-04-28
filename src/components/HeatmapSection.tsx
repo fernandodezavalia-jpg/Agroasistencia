@@ -1,4 +1,5 @@
 import React from 'react';
+import { Download } from 'lucide-react';
 import { displayCrewName, getAttendance, getBins } from '../lib/harvestData';
 import type { HarvestData } from '../lib/harvestData';
 
@@ -14,6 +15,7 @@ interface HeatmapSectionProps {
   dayB: (date: string) => number;
   selectedCrew: string | null;
   onSelectCrew: (crew: string | null) => void;
+  onExport: () => void;
 }
 
 const bgA = (value: number | null, sunday: number) => {
@@ -66,6 +68,7 @@ export default function HeatmapSection({
   dayB,
   selectedCrew,
   onSelectCrew,
+  onExport,
 }: HeatmapSectionProps) {
   const getRend = (crew: string, date: string) => {
     const attendance = getAttendance(harvestData, crew, date);
@@ -84,16 +87,24 @@ export default function HeatmapSection({
   return (
     <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 overflow-x-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex items-center gap-4 flex-wrap">
           <p className="text-xs text-brand-secondary font-bold m-0 tracking-widest uppercase">Mapa de Calor</p>
+          <button
+            onClick={onExport}
+            className="flex items-center gap-1.5 bg-brand-primary hover:bg-[#122e22] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+            title="Exportar a Excel"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar
+          </button>
           {selectedCrew && (
-            <p className="text-sm text-brand-primary font-semibold">Cuadrilla seleccionada: {displayCrewName(selectedCrew)}</p>
+            <p className="text-sm text-brand-primary font-semibold m-0">Cuadrilla: {displayCrewName(selectedCrew)}</p>
           )}
         </div>
         <div className="flex gap-2 p-1 bg-brand-neutral border border-gray-200 rounded-full">
           {[
             { id: 'a', label: 'Asistencia' },
-            { id: 'b', label: 'Bins/Bolsones' },
+            { id: 'b', label: 'Producción' },
             { id: 'r', label: 'Rendimiento' },
           ].map((tab) => (
             <button

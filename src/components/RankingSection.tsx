@@ -7,6 +7,7 @@ interface Props {
   crewCompanies: Record<string, string>;
   harvestData: HarvestData;
   activeDT: string[];
+  periodLabel: string;
 }
 
 const COMPANY_BADGE: Record<string, string> = {
@@ -16,7 +17,7 @@ const COMPANY_BADGE: Record<string, string> = {
 
 const MEDAL_COLOR = ['text-amber-400', 'text-slate-400', 'text-amber-700'];
 
-export default function RankingSection({ crews, crewCompanies, harvestData, activeDT }: Props) {
+export default function RankingSection({ crews, crewCompanies, harvestData, activeDT, periodLabel }: Props) {
   const ranked = useMemo(() => {
     return crews
       .map((crew) => {
@@ -56,7 +57,7 @@ export default function RankingSection({ crews, crewCompanies, harvestData, acti
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <p className="text-xs text-brand-secondary font-bold tracking-widest uppercase">
-            Ranking Histórico — Temporada Completa
+            Ranking — {periodLabel}
           </p>
           <p className="text-xs text-brand-secondary mt-1">
             {ranked.length} cuadrillas con actividad · ordenadas por rendimiento

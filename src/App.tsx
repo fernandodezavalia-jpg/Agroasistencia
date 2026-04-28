@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Download } from 'lucide-react';
 import XLSXStyle from 'xlsx-js-style';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import type { User } from 'firebase/auth';
@@ -162,13 +161,17 @@ export default function App() {
     };
   }, [crews, crewCompanies, harvestData, seasonConfig, campaignYear, user]);
 
-  // Carga historial cuando el usuario abre el tab por primera vez o cambia de año de campaña
+  const historyLoadedForYearRef = useRef<number | null>(null);
+
+  // Carga historial solo cuando cambia el año de campaña (cachea entre visitas al tab)
   useEffect(() => {
     if (activeTab !== 'hs' || !user) return;
+    if (historyLoadedForYearRef.current === campaignYear) return;
     setHistoryLoading(true);
     const years = [campaignYear - 4, campaignYear - 3, campaignYear - 2, campaignYear - 1, campaignYear];
     fetchHistoricalCampaigns(years).then((data) => {
       setHistoricalData(data);
+      historyLoadedForYearRef.current = campaignYear;
       setHistoryLoading(false);
     });
   }, [activeTab, campaignYear, user]);
@@ -285,6 +288,8 @@ export default function App() {
       if (!raw) {
         delete currentRecord.attendance;
         delete currentRecord.bins;
+        delete currentRecord.binsIndustria;
+        delete currentRecord.binsExportacion;
         delete currentRecord.bus;
         delete currentRecord.foreman;
       } else {
@@ -309,7 +314,7 @@ export default function App() {
       '¿Estás seguro que querés borrar todos los datos de este día? Esta acción no se puede deshacer.',
       () => {
         const nextData: HarvestData = { ...harvestData };
-        crews.forEach((crew) => setRecord(nextData, crew, asDate, {}));
+        filteredCrews.forEach((crew) => setRecord(nextData, crew, asDate, {}));
         setHarvestData(nextData);
         showMsg(setAsMsg, 'Día borrado', 'text-gray-400');
         closeConfirm();
@@ -320,7 +325,7 @@ export default function App() {
 
   const handleSaveBi = () => {
     const nextData: HarvestData = { ...harvestData };
-    crews.forEach((crew) => {
+    filteredCrews.forEach((crew) => {
       if (getAttendance(nextData, crew, biDate) === null) return;
       const currentRecord = { ...getRecord(nextData, crew, biDate) };
       const rawInd = biInputs[crew]?.industria.trim() ?? '';
@@ -355,7 +360,7 @@ export default function App() {
       '¿Estás seguro que querés borrar la producción de este día? Esta acción no se puede deshacer.',
       () => {
         const nextData: HarvestData = { ...harvestData };
-        crews.forEach((crew) => {
+        filteredCrews.forEach((crew) => {
           const currentRecord = { ...getRecord(nextData, crew, biDate) };
           delete currentRecord.bins;
           delete currentRecord.binsIndustria;
@@ -796,9 +801,9 @@ export default function App() {
         {[
           { id: 'db', label: 'Dashboard', icon: '📊' },
           { id: 'as', label: 'Asistencia', icon: '👥' },
-          { id: 'bi', label: 'Bins/Bolsones', icon: '🍋' },
+          { id: 'bi', label: 'Producción', icon: '🍋' },
           { id: 'cq', label: 'Cuadrillas', icon: '📋' },
-          { id: 'dt', label: 'Detalle', icon: '📅' },
+          { id: 'dt', label: 'Mapa de Calor', icon: '🔥' },
           { id: 'tm', label: 'Temporada', icon: '🎯' },
           { id: 'rk', label: 'Ranking', icon: '🏆' },
           { id: 'hs', label: 'Historial', icon: '📈' },
@@ -942,6 +947,7 @@ export default function App() {
           crewCompanies={crewCompanies}
           harvestData={harvestData}
           activeDT={filteredDT}
+          periodLabel={getPeriodLabel(periodFilter, campaignYear)}
         />
       )}
 
@@ -957,50 +963,20 @@ export default function App() {
       )}
 
       {activeTab === 'dt' && (
-        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 overflow-x-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <p className="text-xs text-brand-secondary font-bold m-0 tracking-widest uppercase">Mapa de Calor</p>
-              <button
-                onClick={handleExportExcel}
-                className="flex items-center gap-1.5 bg-brand-primary hover:bg-[#122e22] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
-                title="Exportar a Excel"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Exportar
-              </button>
-            </div>
-            <div className="flex gap-2 p-1 bg-brand-neutral border border-gray-200 rounded-full">
-              {[
-                { id: 'a', label: 'Asistencia' },
-                { id: 'b', label: 'Bins/Bolsones' },
-                { id: 'r', label: 'Rendimiento' },
-              ].map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => setHmMode(option.id as 'a' | 'b' | 'r')}
-                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all ${hmMode === option.id ? 'bg-white text-brand-primary shadow-sm border border-gray-200' : 'bg-transparent text-brand-secondary hover:text-brand-primary'}`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <HeatmapSection
-            harvestData={harvestData}
-            filteredCrews={filteredCrews}
-            filteredDT={filteredDT}
-            calendarDT={activeDT}
-            calendarSN={activeSN}
-            hmMode={hmMode}
-            setHmMode={setHmMode}
-            dayW={metrics.dayW}
-            dayB={metrics.dayB}
-            selectedCrew={selectedCrew}
-            onSelectCrew={setSelectedCrew}
-          />
-        </div>
+        <HeatmapSection
+          harvestData={harvestData}
+          filteredCrews={filteredCrews}
+          filteredDT={filteredDT}
+          calendarDT={activeDT}
+          calendarSN={activeSN}
+          hmMode={hmMode}
+          setHmMode={setHmMode}
+          dayW={metrics.dayW}
+          dayB={metrics.dayB}
+          selectedCrew={selectedCrew}
+          onSelectCrew={setSelectedCrew}
+          onExport={handleExportExcel}
+        />
       )}
     </div>
   );

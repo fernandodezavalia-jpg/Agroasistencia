@@ -170,7 +170,7 @@ export function useDashboardMetrics({
   );
 
   const projectedMonthBins = useMemo(() => {
-    const month = asDate.split('/')[1];
+    const month = todayKey.split('/')[1];
     const monthWorkDates = activeDT.filter((date, i) => date.split('/')[1] === month && activeSN[i] === 0);
     const monthBinsSoFar = filteredCrews.reduce(
       (sum, crew) =>
@@ -183,7 +183,7 @@ export function useDashboardMetrics({
     return activeMonthWorkDays > 0
       ? Math.round((monthBinsSoFar / activeMonthWorkDays) * monthWorkDates.length)
       : null;
-  }, [asDate, filteredCrews, harvestData, activeDT, activeSN]);
+  }, [todayKey, filteredCrews, harvestData, activeDT, activeSN]);
 
   // Bus/foreman period counts for AttendanceSection
   const asCurrentMonth = asDate.split('/')[1];
