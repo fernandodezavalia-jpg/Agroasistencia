@@ -424,13 +424,6 @@ export default function App() {
     const rangeLabel = filteredDT.length > 0 ? `${filteredDT[0]} → ${filteredDT[filteredDT.length - 1]}` : '—';
     const exportDate = formatDateKey(new Date());
 
-    const hasSplitBins = filteredCrews.some((crew) =>
-      filteredDT.some((date) => {
-        const rec = getRecord(harvestData, crew, date);
-        return rec.binsIndustria !== undefined || rec.binsExportacion !== undefined;
-      }),
-    );
-
     const rows: Array<Record<string, string | number>> = [];
     filteredDT.forEach((date) => {
       filteredCrews.forEach((crew) => {
@@ -439,21 +432,16 @@ export default function App() {
         const bus = getBus(harvestData, crew, date) ? 1 : 0;
         const foreman = getForeman(harvestData, crew, date) ? 1 : 0;
         if (attendance !== null || bins !== null || bus || foreman) {
-          const row: Record<string, string | number> = {
+          rows.push({
             Día: date,
             Cuadrilla: crew.charAt(0) + crew.slice(1).toLowerCase(),
             Capataz: foreman,
             Colectivo: bus,
             Asistencia: attendance ?? 0,
-          };
-          if (hasSplitBins) {
-            row['Bins Industria'] = getBinsIndustria(harvestData, crew, date) ?? 0;
-            row['Bins Exportación'] = getBinsExportacion(harvestData, crew, date) ?? 0;
-            row['Bins Total'] = bins ?? 0;
-          } else {
-            row['Bins/Bolsones'] = bins ?? 0;
-          }
-          rows.push(row);
+            'Bins Industria': getBinsIndustria(harvestData, crew, date) ?? 0,
+            'Bins Exportación': getBinsExportacion(harvestData, crew, date) ?? 0,
+            'Bins Total': bins ?? 0,
+          });
         }
       });
     });
@@ -462,11 +450,9 @@ export default function App() {
     const sumCapataz = rows.reduce((s, r) => s + (r['Capataz'] as number), 0);
     const sumColectivo = rows.reduce((s, r) => s + (r['Colectivo'] as number), 0);
     const sumAsistencia = rows.reduce((s, r) => s + (r['Asistencia'] as number), 0);
-    const sumBins = hasSplitBins
-      ? rows.reduce((s, r) => s + (r['Bins Total'] as number), 0)
-      : rows.reduce((s, r) => s + (r['Bins/Bolsones'] as number), 0);
-    const sumBinsInd = hasSplitBins ? rows.reduce((s, r) => s + (r['Bins Industria'] as number), 0) : 0;
-    const sumBinsExp = hasSplitBins ? rows.reduce((s, r) => s + (r['Bins Exportación'] as number), 0) : 0;
+    const sumBins = rows.reduce((s, r) => s + (r['Bins Total'] as number), 0);
+    const sumBinsInd = rows.reduce((s, r) => s + (r['Bins Industria'] as number), 0);
+    const sumBinsExp = rows.reduce((s, r) => s + (r['Bins Exportación'] as number), 0);
 
     const ws = XLSXStyle.utils.aoa_to_sheet([]);
 
@@ -480,9 +466,7 @@ export default function App() {
     infoRows.forEach((row) => XLSXStyle.utils.sheet_add_aoa(ws, [row], { origin: -1 }));
 
     const HEADER_ROW = 5;
-    const headers = hasSplitBins
-      ? ['Día', 'Cuadrilla', 'Capataz', 'Colectivo', 'Asistencia', 'Bins Industria', 'Bins Exportación', 'Bins Total']
-      : ['Día', 'Cuadrilla', 'Capataz', 'Colectivo', 'Asistencia', 'Bins/Bolsones'];
+    const headers = ['Día', 'Cuadrilla', 'Capataz', 'Colectivo', 'Asistencia', 'Bins Industria', 'Bins Exportación', 'Bins Total'];
     XLSXStyle.utils.sheet_add_aoa(ws, [headers], { origin: -1 });
 
     // Style header row
@@ -517,9 +501,7 @@ export default function App() {
     XLSXStyle.utils.sheet_add_aoa(ws, [[]], { origin: -1 });
 
     // Totals row
-    const totalsRow = hasSplitBins
-      ? ['TOTALES', '', sumCapataz, sumColectivo, sumAsistencia, sumBinsInd, sumBinsExp, sumBins]
-      : ['TOTALES', '', sumCapataz, sumColectivo, sumAsistencia, sumBins];
+    const totalsRow = ['TOTALES', '', sumCapataz, sumColectivo, sumAsistencia, sumBinsInd, sumBinsExp, sumBins];
     XLSXStyle.utils.sheet_add_aoa(ws, [totalsRow], { origin: -1 });
     const totalsRowIdx = HEADER_ROW + rows.length + 1;
     totalsRow.forEach((val, colIdx) => {
@@ -540,9 +522,7 @@ export default function App() {
     }
 
     // Column widths
-    ws['!cols'] = hasSplitBins
-      ? [{ wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 }]
-      : [{ wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
 
     const wb = XLSXStyle.utils.book_new();
     XLSXStyle.utils.book_append_sheet(wb, ws, 'Datos');
