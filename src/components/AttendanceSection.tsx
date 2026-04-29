@@ -54,7 +54,7 @@ export default function AttendanceSection({
   const currentMonth = asDate.split('/')[1];
 
   const datesWithAttendance = useMemo(
-    () => new Set(calendarDT.filter(date => filteredCrews.some(crew => getAttendance(harvestData, crew, date) !== null))),
+    () => new Set(calendarDT.filter(date => filteredCrews.some(crew => (getAttendance(harvestData, crew, date) ?? 0) > 0))),
     [calendarDT, filteredCrews, harvestData],
   );
 

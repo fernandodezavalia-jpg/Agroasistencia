@@ -78,13 +78,13 @@ export default function BinsSection({
           </span>
         </div>
 
-        {filteredCrews.filter((crew) => getAttendance(harvestData, crew, biDate) !== null).length === 0 ? (
+        {filteredCrews.filter((crew) => (getAttendance(harvestData, crew, biDate) ?? 0) > 0).length === 0 ? (
           <div className="bg-slate-50 rounded-3xl p-6 text-center border border-gray-200 shadow-sm">
             <p className="text-sm font-bold text-brand-secondary m-0">No hay asistencia cargada para este día.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {filteredCrews.filter((crew) => getAttendance(harvestData, crew, biDate) !== null).map((crew) => {
+            {filteredCrews.filter((crew) => (getAttendance(harvestData, crew, biDate) ?? 0) > 0).map((crew) => {
               const totalBins = getBins(harvestData, crew, biDate);
               const indBins = getBinsIndustria(harvestData, crew, biDate);
               const expBins = getBinsExportacion(harvestData, crew, biDate);
@@ -179,7 +179,7 @@ export default function BinsSection({
               );
             }
 
-            const hasAttendance = filteredCrews.some((crew) => getAttendance(harvestData, crew, date) !== null);
+            const hasAttendance = filteredCrews.some((crew) => (getAttendance(harvestData, crew, date) ?? 0) > 0);
             if (!hasAttendance) {
               return (
                 <div key={date} className="w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 bg-brand-neutral border border-gray-200 select-none opacity-50">
@@ -190,7 +190,7 @@ export default function BinsSection({
             }
 
             const totalBins = filteredCrews.reduce((sum, crew) => sum + (getBins(harvestData, crew, date) || 0), 0);
-            const hasBins = filteredCrews.some((crew) => getBins(harvestData, crew, date) !== null);
+            const hasBins = filteredCrews.some((crew) => (getBins(harvestData, crew, date) ?? 0) > 0);
             if (hasBins) {
               return (
                 <div

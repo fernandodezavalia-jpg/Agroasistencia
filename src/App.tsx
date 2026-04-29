@@ -326,7 +326,7 @@ export default function App() {
   const handleSaveBi = () => {
     const nextData: HarvestData = { ...harvestData };
     filteredCrews.forEach((crew) => {
-      if (getAttendance(nextData, crew, biDate) === null) return;
+      if ((getAttendance(nextData, crew, biDate) ?? 0) <= 0) return;
       const currentRecord = { ...getRecord(nextData, crew, biDate) };
       const rawInd = biInputs[crew]?.industria.trim() ?? '';
       const rawExp = biInputs[crew]?.exportacion.trim() ?? '';

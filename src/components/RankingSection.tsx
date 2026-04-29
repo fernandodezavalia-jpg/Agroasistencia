@@ -25,8 +25,8 @@ export default function RankingSection({ crews, crewCompanies, harvestData, acti
         activeDT.forEach((date) => {
           const a = getAttendance(harvestData, crew, date);
           const b = getBins(harvestData, crew, date);
-          if (a !== null) { totalAttendance += a; diasTrabajados += 1; }
-          if (b !== null) totalBins += b;
+          if (a !== null && a > 0) { totalAttendance += a; diasTrabajados += 1; }
+          if (b !== null && b > 0) totalBins += b;
         });
         return {
           crew,

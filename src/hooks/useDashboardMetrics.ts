@@ -272,7 +272,7 @@ export function useDashboardMetrics({
   // Semáforo: compare each crew's last-7-days rendimiento vs full-season average
   const crewSemaforo = useMemo((): CrewSemaforoItem[] => {
     const daysWithData = activeDT.filter((date) =>
-      filteredCrews.some((crew) => getAttendance(harvestData, crew, date) !== null),
+      filteredCrews.some((crew) => (getAttendance(harvestData, crew, date) ?? 0) > 0),
     );
     const recentDays = daysWithData.slice(-7);
 
