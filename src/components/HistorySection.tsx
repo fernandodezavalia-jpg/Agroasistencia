@@ -29,9 +29,16 @@ interface YearStats {
   binsInd: number;
   binsExp: number;
   rendimiento: number | null;
+  jornadaPromedio: number | null;
+  binsPorDia: number | null;
   dias: number;
   diasBins: number;
   hasSplit: boolean;
+}
+
+interface InsightItem {
+  text: string;
+  type: 'positive' | 'negative' | 'neutral';
 }
 
 const COMPANY_BADGE: Record<string, string> = {
@@ -54,15 +61,17 @@ function computeCrewStats(
         const a = getAttendance(campaignDoc.harvestData, crew, date);
         const b = getBins(campaignDoc.harvestData, crew, date);
         const rec = getRecord(campaignDoc.harvestData, crew, date);
-        if (a !== null) { jornales += a; dias++; }
-        if (b !== null) { binsTotal += b; diasBins++; }
-        if (rec.binsIndustria) binsInd += rec.binsIndustria;
-        if (rec.binsExportacion) binsExp += rec.binsExportacion;
+        if (a !== null && a > 0) { jornales += a; dias++; }
+        if (b !== null && b > 0) { binsTotal += b; diasBins++; }
+        if (rec.binsIndustria && rec.binsIndustria > 0) binsInd += rec.binsIndustria;
+        if (rec.binsExportacion && rec.binsExportacion > 0) binsExp += rec.binsExportacion;
       });
       if (jornales === 0 && binsTotal === 0) return null;
       return {
         year, jornales, binsTotal, binsInd, binsExp,
         rendimiento: jornales > 0 && binsTotal > 0 ? Number((binsTotal / jornales).toFixed(2)) : null,
+        jornadaPromedio: dias > 0 ? Number((jornales / dias).toFixed(1)) : null,
+        binsPorDia: diasBins > 0 ? Number((binsTotal / diasBins).toFixed(1)) : null,
         dias, diasBins, hasSplit: binsInd > 0 || binsExp > 0,
       };
     })
@@ -87,22 +96,142 @@ function computeCompanyStats(
           const a = getAttendance(campaignDoc.harvestData, crew, date);
           const b = getBins(campaignDoc.harvestData, crew, date);
           const rec = getRecord(campaignDoc.harvestData, crew, date);
-          if (a !== null) { jornales += a; diasSet.add(date); }
-          if (b !== null) { binsTotal += b; diasBinsSet.add(date); }
-          if (rec.binsIndustria) binsInd += rec.binsIndustria;
-          if (rec.binsExportacion) binsExp += rec.binsExportacion;
+          if (a !== null && a > 0) { jornales += a; diasSet.add(date); }
+          if (b !== null && b > 0) { binsTotal += b; diasBinsSet.add(date); }
+          if (rec.binsIndustria && rec.binsIndustria > 0) binsInd += rec.binsIndustria;
+          if (rec.binsExportacion && rec.binsExportacion > 0) binsExp += rec.binsExportacion;
         });
       });
       if (jornales === 0 && binsTotal === 0) return null;
+      const dias = diasSet.size;
+      const diasBins = diasBinsSet.size;
       return {
         year, jornales, binsTotal, binsInd, binsExp,
         rendimiento: jornales > 0 && binsTotal > 0 ? Number((binsTotal / jornales).toFixed(2)) : null,
-        dias: diasSet.size, diasBins: diasBinsSet.size,
-        hasSplit: binsInd > 0 || binsExp > 0,
+        jornadaPromedio: dias > 0 ? Number((jornales / dias).toFixed(1)) : null,
+        binsPorDia: diasBins > 0 ? Number((binsTotal / diasBins).toFixed(1)) : null,
+        dias, diasBins, hasSplit: binsInd > 0 || binsExp > 0,
       };
     })
     .filter((s): s is YearStats => s !== null);
 }
+
+function computeInsights(stats: YearStats[]): InsightItem[] {
+  if (stats.length < 2) return [];
+  const insights: InsightItem[] = [];
+  const withRend = stats.filter((s) => s.rendimiento !== null);
+
+  // Tendencia de rendimiento
+  if (withRend.length >= 2) {
+    const first = withRend[0];
+    const last = withRend[withRend.length - 1];
+    const totalChange = ((last.rendimiento! - first.rendimiento!) / first.rendimiento!) * 100;
+
+    if (totalChange >= 5) {
+      insights.push({
+        text: `Rendimiento en alza: creció ${totalChange.toFixed(0)}% entre ${first.year} y ${last.year} (${first.rendimiento} → ${last.rendimiento} b/t).`,
+        type: 'positive',
+      });
+    } else if (totalChange <= -5) {
+      insights.push({
+        text: `Rendimiento en baja: cayó ${Math.abs(totalChange).toFixed(0)}% entre ${first.year} y ${last.year} (${first.rendimiento} → ${last.rendimiento} b/t).`,
+        type: 'negative',
+      });
+    } else {
+      insights.push({
+        text: `Rendimiento estable entre ${first.year} y ${last.year}: ${first.rendimiento} → ${last.rendimiento} b/t (variación < 5%).`,
+        type: 'neutral',
+      });
+    }
+
+    // Consistencia (coeficiente de variación)
+    if (withRend.length >= 3) {
+      const mean = withRend.reduce((s, r) => s + r.rendimiento!, 0) / withRend.length;
+      const variance = withRend.reduce((s, r) => s + Math.pow(r.rendimiento! - mean, 2), 0) / withRend.length;
+      const cv = Math.sqrt(variance) / mean;
+      if (cv < 0.10) {
+        insights.push({
+          text: `Rendimiento muy consistente entre temporadas (variación del ${(cv * 100).toFixed(0)}% respecto al promedio de ${mean.toFixed(2)} b/t). Perfil estable y predecible.`,
+          type: 'positive',
+        });
+      } else if (cv > 0.25) {
+        insights.push({
+          text: `Rendimiento variable entre temporadas (desviación del ${(cv * 100).toFixed(0)}% respecto al promedio). Hay margen para mejorar la consistencia.`,
+          type: 'negative',
+        });
+      }
+    }
+  }
+
+  // Pico de producción vs pico de rendimiento
+  const bestBins = stats.reduce((best, s) => s.binsTotal > best.binsTotal ? s : best, stats[0]);
+  const bestRend = withRend.length > 0
+    ? withRend.reduce((best, s) => s.rendimiento! > best.rendimiento! ? s : best)
+    : null;
+
+  if (bestRend && bestBins.year !== bestRend.year) {
+    insights.push({
+      text: `El pico de producción fue en ${bestBins.year} (${bestBins.binsTotal.toLocaleString('es-AR')} bins), pero el mejor rendimiento individual fue en ${bestRend.year} (${bestRend.rendimiento} b/t). Más producción no siempre significa más eficiencia.`,
+      type: 'neutral',
+    });
+  } else if (bestRend && bestBins.year === bestRend.year) {
+    insights.push({
+      text: `${bestBins.year} fue el año pico en ambas métricas: mayor producción (${bestBins.binsTotal.toLocaleString('es-AR')} bins) y mejor rendimiento (${bestRend.rendimiento} b/t).`,
+      type: 'positive',
+    });
+  }
+
+  // Tendencia de equipo (jornales/día)
+  const withStaff = stats.filter((s) => s.jornadaPromedio !== null);
+  if (withStaff.length >= 2) {
+    const firstS = withStaff[0];
+    const lastS = withStaff[withStaff.length - 1];
+    const staffChange = ((lastS.jornadaPromedio! - firstS.jornadaPromedio!) / firstS.jornadaPromedio!) * 100;
+    if (staffChange >= 10) {
+      insights.push({
+        text: `El equipo promedio por día creció: ${firstS.jornadaPromedio} → ${lastS.jornadaPromedio} trabajadores/día entre ${firstS.year} y ${lastS.year} (+${staffChange.toFixed(0)}%).`,
+        type: 'positive',
+      });
+    } else if (staffChange <= -10) {
+      insights.push({
+        text: `El equipo promedio por día se redujo: ${firstS.jornadaPromedio} → ${lastS.jornadaPromedio} trabajadores/día entre ${firstS.year} y ${lastS.year} (${staffChange.toFixed(0)}%).`,
+        type: 'negative',
+      });
+    }
+  }
+
+  // Tendencia ratio exportación (si hay datos split)
+  const splitStats = stats.filter((s) => s.hasSplit && s.binsTotal > 0);
+  if (splitStats.length >= 2) {
+    const firstSplit = splitStats[0];
+    const lastSplit = splitStats[splitStats.length - 1];
+    const firstExpPct = (firstSplit.binsExp / firstSplit.binsTotal) * 100;
+    const lastExpPct = (lastSplit.binsExp / lastSplit.binsTotal) * 100;
+    const diff = lastExpPct - firstExpPct;
+    if (diff >= 5) {
+      insights.push({
+        text: `La proporción de exportación creció del ${firstExpPct.toFixed(0)}% al ${lastExpPct.toFixed(0)}% del total de bins entre ${firstSplit.year} y ${lastSplit.year}.`,
+        type: 'positive',
+      });
+    } else if (diff <= -5) {
+      insights.push({
+        text: `La proporción de exportación bajó del ${firstExpPct.toFixed(0)}% al ${lastExpPct.toFixed(0)}% del total de bins entre ${firstSplit.year} y ${lastSplit.year}.`,
+        type: 'neutral',
+      });
+    }
+  }
+
+  return insights;
+}
+
+const insightIcon = (type: InsightItem['type']) =>
+  type === 'positive' ? '↑' : type === 'negative' ? '↓' : '→';
+
+const insightColors = {
+  positive: { border: 'border-emerald-200', bg: 'bg-emerald-50', icon: 'text-emerald-600', text: 'text-emerald-900' },
+  negative: { border: 'border-red-200', bg: 'bg-red-50', icon: 'text-red-600', text: 'text-red-900' },
+  neutral: { border: 'border-blue-200', bg: 'bg-blue-50', icon: 'text-blue-600', text: 'text-blue-900' },
+};
 
 export default function HistorySection({
   crews,
@@ -121,7 +250,6 @@ export default function HistorySection({
     [historicalData],
   );
 
-  // Union de cuadrillas y empresas entre años + campaña actual
   const allCrewCompanies = useMemo(() => {
     const result: Record<string, string> = { ...crewCompanies };
     Object.values(historicalData).forEach((doc) => {
@@ -145,7 +273,6 @@ export default function HistorySection({
     [allCrewCompanies],
   );
 
-  // Inicializar selecciones cuando llegan los datos
   useEffect(() => {
     if (preselectedCompany && companies.includes(preselectedCompany)) {
       setSelectedCompany(preselectedCompany);
@@ -168,7 +295,6 @@ export default function HistorySection({
     [selectedCompany, allCrews, allCrewCompanies],
   );
 
-  // Stats por cuadrilla o empresa
   const stats = useMemo((): YearStats[] => {
     if (viewMode === 'crew') {
       if (!selectedCrew) return [];
@@ -180,7 +306,6 @@ export default function HistorySection({
     }
   }, [viewMode, selectedCrew, selectedCompany, years, historicalData, allCrews, allCrewCompanies]);
 
-  // Preview rápido de cada cuadrilla en el picker
   const crewPreviews = useMemo(() => {
     const result: Record<string, { seasons: number; avgRend: number | null }> = {};
     filteredCrewsForPicker.forEach((crew) => {
@@ -196,7 +321,6 @@ export default function HistorySection({
 
   const hasSplitData = stats.some((s) => s.hasSplit);
 
-  // KPIs de resumen
   const kpis = useMemo(() => {
     if (stats.length === 0) return null;
     const withRend = stats.filter((s) => s.rendimiento !== null);
@@ -206,13 +330,20 @@ export default function HistorySection({
       : null;
     const last = stats[stats.length - 1];
     const prev = stats.length >= 2 ? stats[stats.length - 2] : null;
-    const trend = last?.rendimiento !== null && prev?.rendimiento !== null && prev?.rendimiento
-      ? Number((((last!.rendimiento! - prev!.rendimiento!) / prev!.rendimiento!) * 100).toFixed(1))
+    const trend = last?.rendimiento != null && prev?.rendimiento != null && prev.rendimiento > 0
+      ? Number((((last.rendimiento - prev.rendimiento) / prev.rendimiento) * 100).toFixed(1))
       : null;
-    return { best, avgRend, trend, seasons: stats.length };
+    const totalBins = stats.reduce((s, r) => s + r.binsTotal, 0);
+    const withStaff = stats.filter((s) => s.jornadaPromedio !== null);
+    const avgStaff = withStaff.length > 0
+      ? Number((withStaff.reduce((s, r) => s + r.jornadaPromedio!, 0) / withStaff.length).toFixed(1))
+      : null;
+    const avgDias = Math.round(stats.reduce((s, r) => s + r.dias, 0) / stats.length);
+    return { best, avgRend, trend, seasons: stats.length, totalBins, avgStaff, avgDias };
   }, [stats]);
 
-  // Datos para los gráficos
+  const insights = useMemo(() => computeInsights(stats), [stats]);
+
   const productionChartData = stats.map((s) => ({
     year: String(s.year),
     ...(hasSplitData
@@ -224,7 +355,8 @@ export default function HistorySection({
   const workersChartData = stats.map((s) => ({
     year: String(s.year),
     Jornales: s.jornales,
-    'Días trabajados': s.dias,
+    'Trab./día': s.jornadaPromedio,
+    'Días trab.': s.dias,
   }));
 
   if (isLoading) {
@@ -258,7 +390,7 @@ export default function HistorySection({
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h2 className="text-xl font-heading font-bold text-brand-primary">Evolución Histórica</h2>
-            <p className="text-sm text-brand-secondary mt-1">Comparativa de temporadas por cuadrilla o empresa.</p>
+            <p className="text-sm text-brand-secondary mt-1">Comparativa de temporadas y análisis de tendencias.</p>
           </div>
           <div className="flex gap-1 p-1 bg-brand-neutral border border-gray-200 rounded-full">
             {[{ id: 'crew', label: 'Por cuadrilla' }, { id: 'company', label: 'Por empresa' }].map((opt) => (
@@ -345,41 +477,86 @@ export default function HistorySection({
         </div>
       ) : (
         <>
-          {/* KPIs de resumen */}
+          {/* KPIs — fila 1: Producción */}
           {kpis && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-                <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Temporadas activas</p>
-                <p className="text-3xl font-heading font-extrabold text-brand-primary">{kpis.seasons}</p>
-                <p className="text-xs text-brand-secondary mt-1">con datos registrados</p>
+            <>
+              <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest ml-1">Resumen histórico — {entityLabel}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary" />
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Temporadas activas</p>
+                  <p className="text-3xl font-heading font-extrabold text-brand-primary">{kpis.seasons}</p>
+                  <p className="text-xs text-brand-secondary mt-1">con datos registrados</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-[#52B788]" />
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Rend. promedio histórico</p>
+                  <p className="text-3xl font-heading font-extrabold text-brand-primary">
+                    {kpis.avgRend !== null ? kpis.avgRend : '—'}
+                  </p>
+                  <p className="text-xs text-brand-secondary mt-1">bins / trabajador</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-amber-400" />
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Mejor temporada</p>
+                  <p className="text-3xl font-heading font-extrabold text-brand-primary">
+                    {kpis.best ? kpis.best.year : '—'}
+                  </p>
+                  <p className="text-xs text-brand-secondary mt-1">
+                    {kpis.best?.rendimiento != null ? `${kpis.best.rendimiento} b/t` : 'sin rendimiento'}
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className={`absolute top-0 left-0 w-1 h-full ${kpis.trend === null ? 'bg-gray-300' : kpis.trend >= 0 ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Tendencia vs. año anterior</p>
+                  <p className={`text-3xl font-heading font-extrabold ${kpis.trend === null ? 'text-brand-secondary' : kpis.trend >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {kpis.trend === null ? '—' : `${kpis.trend > 0 ? '+' : ''}${kpis.trend}%`}
+                  </p>
+                  <p className="text-xs text-brand-secondary mt-1">en rendimiento</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-brand-secondary" />
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Bins acumulados</p>
+                  <p className="text-3xl font-heading font-extrabold text-brand-primary">
+                    {kpis.totalBins.toLocaleString('es-AR')}
+                  </p>
+                  <p className="text-xs text-brand-secondary mt-1">en todas las temporadas</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary opacity-40" />
+                  <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Equipo promedio / día</p>
+                  <p className="text-3xl font-heading font-extrabold text-brand-primary">
+                    {kpis.avgStaff !== null ? kpis.avgStaff : '—'}
+                  </p>
+                  <p className="text-xs text-brand-secondary mt-1">trabajadores por día trabajado</p>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-                <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Rend. promedio histórico</p>
-                <p className="text-3xl font-heading font-extrabold text-brand-primary">
-                  {kpis.avgRend !== null ? kpis.avgRend : '—'}
-                </p>
-                <p className="text-xs text-brand-secondary mt-1">bins / trabajador</p>
+            </>
+          )}
+
+          {/* Panel de análisis automático */}
+          {insights.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 bg-brand-neutral/40">
+                <p className="text-xs text-brand-secondary font-bold tracking-widest uppercase">Análisis automático</p>
               </div>
-              <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-                <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Mejor temporada</p>
-                <p className="text-3xl font-heading font-extrabold text-brand-primary">
-                  {kpis.best ? kpis.best.year : '—'}
-                </p>
-                <p className="text-xs text-brand-secondary mt-1">
-                  {kpis.best?.rendimiento !== null ? `${kpis.best?.rendimiento} b/t` : 'sin rendimiento'}
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-                <p className="text-[10px] font-bold text-brand-secondary uppercase tracking-wider mb-2">Tendencia vs. año anterior</p>
-                <p className={`text-3xl font-heading font-extrabold ${kpis.trend === null ? 'text-brand-secondary' : kpis.trend >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {kpis.trend === null ? '—' : `${kpis.trend > 0 ? '+' : ''}${kpis.trend}%`}
-                </p>
-                <p className="text-xs text-brand-secondary mt-1">en rendimiento</p>
+              <div className="p-5 flex flex-col gap-3">
+                {insights.map((ins, i) => {
+                  const c = insightColors[ins.type];
+                  return (
+                    <div key={i} className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${c.border} ${c.bg}`}>
+                      <span className={`text-xs font-extrabold mt-0.5 flex-shrink-0 w-4 text-center ${c.icon}`}>
+                        {insightIcon(ins.type)}
+                      </span>
+                      <p className={`text-sm font-medium leading-snug ${c.text}`}>{ins.text}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Tabla */}
+          {/* Tabla detallada con Δ% */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <p className="text-xs text-brand-secondary font-bold tracking-widest uppercase">
@@ -391,8 +568,9 @@ export default function HistorySection({
                 <thead>
                   <tr className="bg-brand-neutral">
                     <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-5 py-3">Temporada</th>
-                    <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Días trab.</th>
+                    <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Días</th>
                     <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Jornales</th>
+                    <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Trab./día</th>
                     <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Bins Total</th>
                     {hasSplitData && (
                       <>
@@ -400,16 +578,21 @@ export default function HistorySection({
                         <th className="text-center text-xs font-bold text-[#92400E] uppercase tracking-wider px-4 py-3">Exportación</th>
                       </>
                     )}
+                    <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Bins/día</th>
                     <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Rendimiento</th>
+                    <th className="text-center text-xs font-bold text-brand-secondary uppercase tracking-wider px-4 py-3">Δ rend.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {stats.map((s, idx) => {
-                    const isLast = s === stats[stats.length - 1];
                     const prev = idx > 0 ? stats[idx - 1] : null;
-                    const rendDelta = s.rendimiento !== null && prev?.rendimiento != null
-                      ? s.rendimiento - prev.rendimiento
+                    const rendDelta = s.rendimiento != null && prev?.rendimiento != null && prev.rendimiento > 0
+                      ? Number((((s.rendimiento - prev.rendimiento) / prev.rendimiento) * 100).toFixed(1))
                       : null;
+                    const binsDelta = prev?.binsTotal != null && prev.binsTotal > 0
+                      ? Number((((s.binsTotal - prev.binsTotal) / prev.binsTotal) * 100).toFixed(1))
+                      : null;
+                    void binsDelta; // computed but shown via rendDelta column per UX
                     return (
                       <tr
                         key={s.year}
@@ -428,6 +611,9 @@ export default function HistorySection({
                           <span className="font-bold text-brand-primary text-sm">{s.jornales.toLocaleString('es-AR')}</span>
                         </td>
                         <td className="px-4 py-4 text-center">
+                          <span className="font-medium text-brand-secondary text-sm">{s.jornadaPromedio ?? '—'}</span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
                           <span className="font-bold text-brand-primary text-sm">{s.binsTotal > 0 ? s.binsTotal.toLocaleString('es-AR') : '—'}</span>
                         </td>
                         {hasSplitData && (
@@ -441,16 +627,21 @@ export default function HistorySection({
                           </>
                         )}
                         <td className="px-4 py-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <span className={`font-bold text-sm ${s.rendimiento !== null ? 'text-brand-primary' : 'text-gray-400'}`}>
-                              {s.rendimiento !== null ? `${s.rendimiento} b/t` : '—'}
+                          <span className="font-medium text-brand-secondary text-sm">{s.binsPorDia ?? '—'}</span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`font-bold text-sm ${s.rendimiento != null ? 'text-brand-primary' : 'text-gray-400'}`}>
+                            {s.rendimiento != null ? `${s.rendimiento} b/t` : '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {rendDelta !== null ? (
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${rendDelta > 0 ? 'bg-emerald-100 text-emerald-700' : rendDelta < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {rendDelta > 0 ? '+' : ''}{rendDelta}%
                             </span>
-                            {rendDelta !== null && !isLast && (
-                              <span className={`text-[10px] font-bold ${rendDelta > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                {rendDelta > 0 ? '▲' : '▼'}
-                              </span>
-                            )}
-                          </div>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -463,10 +654,10 @@ export default function HistorySection({
           {/* Gráficos año vs año */}
           {stats.length >= 2 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Producción */}
+              {/* Producción y rendimiento */}
               <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
                 <p className="text-xs text-brand-secondary font-bold mb-6 tracking-widest uppercase">
-                  Producción por Temporada
+                  Producción y Rendimiento por Temporada
                 </p>
                 <div className="h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -497,10 +688,10 @@ export default function HistorySection({
                 </div>
               </div>
 
-              {/* Trabajadores */}
+              {/* Trabajadores y equipo */}
               <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
                 <p className="text-xs text-brand-secondary font-bold mb-6 tracking-widest uppercase">
-                  Trabajadores por Temporada
+                  Jornales y Equipo por Temporada
                 </p>
                 <div className="h-[260px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -511,11 +702,14 @@ export default function HistorySection({
                       <YAxis yAxisId="right" orientation="right" domain={[0, 'auto']} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4A5568', fontFamily: 'Inter', fontWeight: 600 }} dx={10} />
                       <Tooltip
                         contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        formatter={(value: ValueType, name: string) => [Number(value).toLocaleString('es-AR'), name]}
+                        formatter={(value: ValueType, name: string) => [
+                          name === 'Trab./día' ? `${Number(value).toFixed(1)} trab.` : Number(value).toLocaleString('es-AR'),
+                          name,
+                        ]}
                       />
                       <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 700, paddingTop: '12px' }} />
                       <Bar yAxisId="left" dataKey="Jornales" fill="#2D6A4F" radius={[4, 4, 0, 0]} barSize={28} />
-                      <Line yAxisId="right" type="monotone" dataKey="Días trabajados" stroke="#74C69D" strokeWidth={3} dot={{ r: 5, fill: '#74C69D', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} connectNulls />
+                      <Line yAxisId="right" type="monotone" dataKey="Trab./día" stroke="#74C69D" strokeWidth={3} dot={{ r: 5, fill: '#74C69D', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} connectNulls />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
