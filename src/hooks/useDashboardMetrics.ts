@@ -63,7 +63,7 @@ export function useDashboardMetrics({
   const asDays = useMemo(
     () =>
       filteredDT.filter((date) =>
-        filteredCrews.some((crew) => getAttendance(harvestData, crew, date) !== null),
+        filteredCrews.some((crew) => (getAttendance(harvestData, crew, date) ?? 0) > 0),
       ).length,
     [filteredCrews, filteredDT, harvestData],
   );
@@ -71,7 +71,7 @@ export function useDashboardMetrics({
   const biDays = useMemo(
     () =>
       filteredDT.filter((date) =>
-        filteredCrews.some((crew) => getBins(harvestData, crew, date) !== null),
+        filteredCrews.some((crew) => (getBins(harvestData, crew, date) ?? 0) > 0),
       ).length,
     [filteredCrews, filteredDT, harvestData],
   );
@@ -79,7 +79,7 @@ export function useDashboardMetrics({
   const activeCQ = useMemo(
     () =>
       filteredCrews.filter((crew) =>
-        filteredDT.some((date) => getAttendance(harvestData, crew, date) !== null),
+        filteredDT.some((date) => (getAttendance(harvestData, crew, date) ?? 0) > 0),
       ).length,
     [filteredCrews, filteredDT, harvestData],
   );
@@ -163,8 +163,8 @@ export function useDashboardMetrics({
     () =>
       filteredDT.filter(
         (date) =>
-          filteredCrews.some((crew) => getAttendance(harvestData, crew, date) !== null) &&
-          filteredCrews.every((crew) => getBins(harvestData, crew, date) === null),
+          filteredCrews.some((crew) => (getAttendance(harvestData, crew, date) ?? 0) > 0) &&
+          filteredCrews.every((crew) => (getBins(harvestData, crew, date) ?? 0) === 0),
       ).length,
     [filteredCrews, filteredDT, harvestData],
   );
@@ -178,7 +178,7 @@ export function useDashboardMetrics({
       0,
     );
     const activeMonthWorkDays = monthWorkDates.filter((date) =>
-      filteredCrews.some((crew) => getBins(harvestData, crew, date) !== null),
+      filteredCrews.some((crew) => (getBins(harvestData, crew, date) ?? 0) > 0),
     ).length;
     return activeMonthWorkDays > 0
       ? Math.round((monthBinsSoFar / activeMonthWorkDays) * monthWorkDates.length)
