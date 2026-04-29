@@ -939,6 +939,8 @@ export default function App() {
           isLoading={historyLoading}
           campaignYear={campaignYear}
           preselectedCompany={selectedCompany !== 'all' ? selectedCompany : undefined}
+          periodFilter={periodFilter}
+          periodLabel={getPeriodLabel(periodFilter, campaignYear)}
         />
       )}
 

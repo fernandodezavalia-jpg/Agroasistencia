@@ -20,6 +20,8 @@ interface Props {
   isLoading: boolean;
   campaignYear: number;
   preselectedCompany?: string;
+  periodFilter: string;
+  periodLabel: string;
 }
 
 interface YearStats {
@@ -46,16 +48,30 @@ const COMPANY_BADGE: Record<string, string> = {
   'A.Z. Agricolas S.R.L.': 'bg-amber-100 text-amber-800 border-amber-200',
 };
 
+function filterDatesForPeriod(DT: string[], periodFilter: string): string[] {
+  if (periodFilter === 'all') return DT;
+  const [half, month] = periodFilter.split('-');
+  return DT.filter((date) => {
+    const [dayStr, monthStr] = date.split('/');
+    if (monthStr !== month) return false;
+    if (half === 'M') return true;
+    const day = parseInt(dayStr, 10);
+    return half === 'Q1' ? day <= 15 : day >= 16;
+  });
+}
+
 function computeCrewStats(
   crew: string,
   years: number[],
   historicalData: Record<number, CampaignDoc | null>,
+  periodFilter: string,
 ): YearStats[] {
   return years
     .map((year): YearStats | null => {
       const campaignDoc = historicalData[year];
       if (!campaignDoc) return null;
-      const { DT } = generateCalendarForYear(year);
+      const { DT: allDT } = generateCalendarForYear(year);
+      const DT = filterDatesForPeriod(allDT, periodFilter);
       let jornales = 0, binsTotal = 0, binsInd = 0, binsExp = 0, dias = 0, diasBins = 0;
       DT.forEach((date) => {
         const a = getAttendance(campaignDoc.harvestData, crew, date);
@@ -82,12 +98,14 @@ function computeCompanyStats(
   companyCrews: string[],
   years: number[],
   historicalData: Record<number, CampaignDoc | null>,
+  periodFilter: string,
 ): YearStats[] {
   return years
     .map((year): YearStats | null => {
       const campaignDoc = historicalData[year];
       if (!campaignDoc) return null;
-      const { DT } = generateCalendarForYear(year);
+      const { DT: allDT } = generateCalendarForYear(year);
+      const DT = filterDatesForPeriod(allDT, periodFilter);
       let jornales = 0, binsTotal = 0, binsInd = 0, binsExp = 0;
       const diasSet = new Set<string>();
       const diasBinsSet = new Set<string>();
@@ -240,6 +258,8 @@ export default function HistorySection({
   isLoading,
   campaignYear,
   preselectedCompany,
+  periodFilter,
+  periodLabel,
 }: Props) {
   const [viewMode, setViewMode] = useState<'crew' | 'company'>('crew');
   const [selectedCompany, setSelectedCompany] = useState<string>('');
@@ -298,18 +318,18 @@ export default function HistorySection({
   const stats = useMemo((): YearStats[] => {
     if (viewMode === 'crew') {
       if (!selectedCrew) return [];
-      return computeCrewStats(selectedCrew, years, historicalData);
+      return computeCrewStats(selectedCrew, years, historicalData, periodFilter);
     } else {
       if (!selectedCompany) return [];
       const compCrews = allCrews.filter((c) => allCrewCompanies[c] === selectedCompany);
-      return computeCompanyStats(compCrews, years, historicalData);
+      return computeCompanyStats(compCrews, years, historicalData, periodFilter);
     }
-  }, [viewMode, selectedCrew, selectedCompany, years, historicalData, allCrews, allCrewCompanies]);
+  }, [viewMode, selectedCrew, selectedCompany, years, historicalData, allCrews, allCrewCompanies, periodFilter]);
 
   const crewPreviews = useMemo(() => {
     const result: Record<string, { seasons: number; avgRend: number | null }> = {};
     filteredCrewsForPicker.forEach((crew) => {
-      const s = computeCrewStats(crew, years, historicalData);
+      const s = computeCrewStats(crew, years, historicalData, periodFilter);
       const rends = s.map((x) => x.rendimiento).filter((v): v is number => v !== null);
       result[crew] = {
         seasons: s.length,
@@ -317,7 +337,7 @@ export default function HistorySection({
       };
     });
     return result;
-  }, [filteredCrewsForPicker, years, historicalData]);
+  }, [filteredCrewsForPicker, years, historicalData, periodFilter]);
 
   const hasSplitData = stats.some((s) => s.hasSplit);
 
@@ -390,7 +410,12 @@ export default function HistorySection({
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h2 className="text-xl font-heading font-bold text-brand-primary">Evolución Histórica</h2>
-            <p className="text-sm text-brand-secondary mt-1">Comparativa de temporadas y análisis de tendencias.</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <p className="text-sm text-brand-secondary">Comparativa año vs año.</p>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
+                📅 {periodLabel}
+              </span>
+            </div>
           </div>
           <div className="flex gap-1 p-1 bg-brand-neutral border border-gray-200 rounded-full">
             {[{ id: 'crew', label: 'Por cuadrilla' }, { id: 'company', label: 'Por empresa' }].map((opt) => (
