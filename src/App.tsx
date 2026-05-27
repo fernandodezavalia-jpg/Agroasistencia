@@ -75,6 +75,7 @@ export default function App() {
   const [biMsg, setBiMsg] = useState({ text: '', color: '' });
   const [cqMsg, setCqMsg] = useState({ text: '', color: '' });
   const [importMsg, setImportMsg] = useState({ text: '', color: '' });
+  const [saveError, setSaveError] = useState('');
   const [newCq, setNewCq] = useState('');
   const [newCqCompany, setNewCqCompany] = useState(COMPANIES[0]);
   const [selectedCrew, setSelectedCrew] = useState<string | null>(null);
@@ -152,9 +153,10 @@ export default function App() {
     }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      saveCampaign(campaignYear, { harvestData, crews, crewCompanies, seasonConfig }).catch((err) =>
-        console.error('Error saving campaign', err),
-      );
+      saveCampaign(campaignYear, { harvestData, crews, crewCompanies, seasonConfig }).catch((err) => {
+        console.error('Error saving campaign', err);
+        setSaveError('Error al guardar los datos. Verificá tu conexión a internet.');
+      });
     }, 1500);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -172,6 +174,9 @@ export default function App() {
     fetchHistoricalCampaigns(years).then((data) => {
       setHistoricalData(data);
       historyLoadedForYearRef.current = campaignYear;
+      setHistoryLoading(false);
+    }).catch((err) => {
+      console.error('Error al cargar historial', err);
       setHistoryLoading(false);
     });
   }, [activeTab, campaignYear, user]);
@@ -286,10 +291,10 @@ export default function App() {
       const currentRecord = { ...getRecord(nextData, crew, asDate) };
       const raw = asInputs[crew]?.trim();
       if (!raw) {
+        // Solo borramos los campos de asistencia y transporte.
+        // Los bins (binsIndustria / binsExportacion) se gestionan desde la
+        // pestaña Producción y NO deben eliminarse al limpiar la asistencia.
         delete currentRecord.attendance;
-        delete currentRecord.bins;
-        delete currentRecord.binsIndustria;
-        delete currentRecord.binsExportacion;
         delete currentRecord.bus;
         delete currentRecord.foreman;
       } else {
@@ -773,6 +778,12 @@ export default function App() {
         {importMsg.text && (
           <div className={`mt-3 text-sm font-bold ${importMsg.color}`}>{importMsg.text}</div>
         )}
+        {saveError && (
+          <div className="mt-3 flex items-center gap-2 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+            ⚠ {saveError}
+            <button onClick={() => setSaveError('')} className="ml-auto text-red-400 hover:text-red-600 font-bold">✕</button>
+          </div>
+        )}
       </div>
       </div>
 
@@ -963,3 +974,4 @@ export default function App() {
     </div>
   );
 }
+
